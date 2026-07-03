@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Plus, SprayCan, Images } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { uploadImage } from '@/lib/upload';
 import { PerfumeForm, type PerfumeFormData } from './PerfumeForm';
 import { PerfumeList } from './PerfumeList';
 import { BannerManager } from './BannerManager';
@@ -36,20 +35,13 @@ export function AdminDashboard({
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  async function handleSave(formData: PerfumeFormData, imageFile: File | null) {
+  async function handleSave(formData: PerfumeFormData) {
     const supabase = createClient();
-
-    let imagem_url = editing?.imagem_url ?? null;
-    if (imageFile) {
-      imagem_url = await uploadImage(imageFile);
-    }
-
-    const payload = { ...formData, imagem_url };
 
     if (editing) {
       const { data, error } = await supabase
         .from('perfumes')
-        .update(payload)
+        .update(formData)
         .eq('id', editing.id)
         .select()
         .single();
@@ -63,7 +55,7 @@ export function AdminDashboard({
     } else {
       const { data, error } = await supabase
         .from('perfumes')
-        .insert(payload)
+        .insert(formData)
         .select()
         .single();
 

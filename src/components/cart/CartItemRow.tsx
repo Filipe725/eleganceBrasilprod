@@ -17,9 +17,9 @@ export function CartItemRow({ item }: CartItemRowProps) {
   return (
     <li className="flex gap-3 py-4">
       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-ink-800 to-ink-950">
-        {perfume.imagem_url ? (
+        {perfume.fotos[0] ? (
           <Image
-            src={perfume.imagem_url}
+            src={perfume.fotos[0]}
             alt={perfume.nome}
             fill
             sizes="80px"

@@ -5,16 +5,19 @@ import Image from 'next/image';
 import { Loader2, Save, X, ImagePlus } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { FAMILIAS_OLFATIVAS } from '@/lib/constants';
+import { uploadImage } from '@/lib/upload';
 
 export interface PerfumeFormData {
   nome: string;
   marca: string;
   descricao: string;
+  resumo: string | null;
   notas_olfativas: string;
   preco_antigo: number | null;
   preco_atual: number;
   familia_olfativa: string[];
   tamanho: string[];
+  fotos: string[];
   tag_destaque: string | null;
   ativo: boolean;
 }
@@ -22,8 +25,13 @@ export interface PerfumeFormData {
 interface PerfumeFormProps {
   perfume: Perfume | null; // null = criação; preenchido = edição
   seccoes: BannerSeccao[]; // secções da Home disponíveis para o tag_destaque
-  onSave: (data: PerfumeFormData, imageFile: File | null) => Promise<void>;
+  onSave: (data: PerfumeFormData) => Promise<void>;
   onCancel: () => void;
+}
+
+interface FotoItem {
+  url: string; // URL pública existente, ou blob local de pré-visualização
+  file?: File; // presente apenas para fotos novas, ainda não enviadas
 }
 
 const inputClass =
@@ -38,6 +46,7 @@ export function PerfumeForm({
   const [nome, setNome] = useState(perfume?.nome ?? '');
   const [marca, setMarca] = useState(perfume?.marca ?? '');
   const [descricao, setDescricao] = useState(perfume?.descricao ?? '');
+  const [resumo, setResumo] = useState(perfume?.resumo ?? '');
   const [notas, setNotas] = useState(perfume?.notas_olfativas ?? '');
   const [aplicarDesconto, setAplicarDesconto] = useState(
     perfume?.preco_antigo != null
@@ -79,17 +88,24 @@ export function PerfumeForm({
   }
   const [tagDestaque, setTagDestaque] = useState(perfume?.tag_destaque ?? '');
   const [ativo, setAtivo] = useState(perfume?.ativo ?? true);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(
-    perfume?.imagem_url ?? null
+  const [fotos, setFotos] = useState<FotoItem[]>(
+    (perfume?.fotos ?? []).map((url) => ({ url }))
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    setImageFile(file);
-    if (file) setPreview(URL.createObjectURL(file));
+  function handleFotosChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    const novasFotos = files.map((file) => ({
+      url: URL.createObjectURL(file),
+      file,
+    }));
+    setFotos((prev) => [...prev, ...novasFotos]);
+    event.target.value = '';
+  }
+
+  function removeFoto(index: number) {
+    setFotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -155,21 +171,24 @@ export function PerfumeForm({
 
     setSaving(true);
     try {
-      await onSave(
-        {
-          nome: nome.trim(),
-          marca: marca.trim(),
-          descricao: descricao.trim(),
-          notas_olfativas: notas.trim(),
-          preco_antigo: precoAntigoNumber,
-          preco_atual: precoAtualNumber,
-          familia_olfativa: familiaFinal,
-          tamanho: tamanhos,
-          tag_destaque: tagDestaque || null,
-          ativo,
-        },
-        imageFile
+      const fotosFinal = await Promise.all(
+        fotos.map((foto) => (foto.file ? uploadImage(foto.file) : foto.url))
       );
+
+      await onSave({
+        nome: nome.trim(),
+        marca: marca.trim(),
+        descricao: descricao.trim(),
+        resumo: resumo.trim() || null,
+        notas_olfativas: notas.trim(),
+        preco_antigo: precoAntigoNumber,
+        preco_atual: precoAtualNumber,
+        familia_olfativa: familiaFinal,
+        tamanho: tamanhos,
+        fotos: fotosFinal,
+        tag_destaque: tagDestaque || null,
+        ativo,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar.');
       setSaving(false);
@@ -195,39 +214,58 @@ export function PerfumeForm({
         </button>
       </div>
 
-      {/* Upload de imagem */}
+      {/* Galeria de fotos */}
       <div>
         <span className="mb-1.5 block text-sm font-medium text-ink-800">
-          Foto do perfume
+          Fotos do perfume{' '}
+          <span className="font-normal text-ink-700/60">
+            (a primeira é a capa da vitrine)
+          </span>
         </span>
-        <label className="group flex cursor-pointer items-center gap-4">
-          <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-ink-700/25 bg-cream transition group-hover:border-gold-600">
-            {preview ? (
+        <div className="flex flex-wrap gap-3">
+          {fotos.map((foto, index) => (
+            <div
+              key={foto.url}
+              className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-ink-700/15 bg-cream"
+            >
               <Image
-                src={preview}
-                alt="Pré-visualização"
+                src={foto.url}
+                alt={`Foto ${index + 1}`}
                 fill
-                sizes="112px"
+                sizes="96px"
                 className="object-cover"
                 unoptimized
               />
-            ) : (
-              <ImagePlus className="h-8 w-8 text-ink-700/40" aria-hidden />
-            )}
-          </div>
-          <div className="text-sm text-ink-700/70">
-            <p className="font-medium text-ink-800 group-hover:text-gold-600">
-              {preview ? 'Trocar imagem' : 'Selecionar imagem'}
-            </p>
-            <p className="text-xs">JPG, PNG ou WebP — até 5 MB</p>
-          </div>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif"
-            onChange={handleImageChange}
-            className="sr-only"
-          />
-        </label>
+              {index === 0 && (
+                <span className="absolute bottom-0 left-0 right-0 bg-ink-900/70 px-1 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white">
+                  Capa
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeFoto(index)}
+                aria-label={`Remover foto ${index + 1}`}
+                className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-ink-950/70 text-white transition hover:bg-red-600"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </div>
+          ))}
+          <label className="group flex h-24 w-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-ink-700/25 bg-cream text-ink-700/60 transition group-hover:border-gold-600 hover:border-gold-600 hover:text-gold-600">
+            <ImagePlus className="h-6 w-6" aria-hidden />
+            <span className="text-[11px] font-medium">Adicionar</span>
+            <input
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              onChange={handleFotosChange}
+              className="sr-only"
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-xs text-ink-700/60">
+          JPG, PNG ou WebP — até 5 MB cada
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -385,8 +423,29 @@ export function PerfumeForm({
         </div>
 
         <div className="sm:col-span-2">
+          <label htmlFor="resumo" className="mb-1.5 block text-sm font-medium text-ink-800">
+            Resumo{' '}
+            <span className="font-normal text-ink-700/60">
+              (exibido só no card da vitrine, {resumo.length}/100)
+            </span>
+          </label>
+          <textarea
+            id="resumo"
+            rows={2}
+            maxLength={100}
+            value={resumo}
+            onChange={(event) => setResumo(event.target.value)}
+            className={inputClass}
+            placeholder="Ex.: Frescor cítrico com toque amadeirado, ideal para o dia a dia."
+          />
+        </div>
+
+        <div className="sm:col-span-2">
           <label htmlFor="descricao" className="mb-1.5 block text-sm font-medium text-ink-800">
-            Descrição detalhada
+            Descrição detalhada{' '}
+            <span className="font-normal text-ink-700/60">
+              (exibida na página do produto)
+            </span>
           </label>
           <textarea
             id="descricao"

@@ -65,8 +65,8 @@ export function HomeContent({ perfumes, seccoes }: HomeContentProps) {
         />
       ))}
 
-      {/* Catálogo completo com filtro por família olfativa */}
-      <ProductCatalog perfumes={perfumes} />
+      {/* Catálogo completo com filtro por secção promocional */}
+      <ProductCatalog perfumes={perfumes} seccoes={seccoes} />
 
       <QuoteSection />
     </>

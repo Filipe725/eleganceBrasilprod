@@ -2,29 +2,34 @@
 
 import { useMemo, useState } from 'react';
 import { PackageSearch } from 'lucide-react';
-import type { Perfume } from '@/lib/types';
-import { FamilyFilter } from './FamilyFilter';
+import type { BannerSeccao, Perfume } from '@/lib/types';
+import { SectionFilter } from './SectionFilter';
 import { ProductCard } from './ProductCard';
 
 interface ProductCatalogProps {
   perfumes: Perfume[];
+  seccoes: BannerSeccao[];
 }
 
-export function ProductCatalog({ perfumes }: ProductCatalogProps) {
-  const [familia, setFamilia] = useState<string | null>(null);
+export function ProductCatalog({ perfumes, seccoes }: ProductCatalogProps) {
+  const [seccaoAtiva, setSeccaoAtiva] = useState<string | null>(null);
 
-  // Mostra no filtro apenas famílias que existem no catálogo
-  const familias = useMemo(
+  // Mostra no filtro apenas secções que têm ao menos um perfume vinculado
+  const seccoesComProdutos = useMemo(
     () =>
-      Array.from(
-        new Set(perfumes.flatMap((p) => p.familia_olfativa))
-      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [perfumes]
+      seccoes.filter((s) =>
+        perfumes.some((p) => p.tag_destaque === s.seccao)
+      ),
+    [seccoes, perfumes]
   );
 
-  const visiveis = familia
-    ? perfumes.filter((p) => p.familia_olfativa.includes(familia))
+  const visiveis = seccaoAtiva
+    ? perfumes.filter((p) => p.tag_destaque === seccaoAtiva)
     : perfumes;
+
+  const tituloSeccaoAtiva = seccoesComProdutos.find(
+    (s) => s.seccao === seccaoAtiva
+  )?.titulo;
 
   return (
     <section
@@ -40,10 +45,10 @@ export function ProductCatalog({ perfumes }: ProductCatalogProps) {
             Nossa Coleção
           </h2>
         </div>
-        <FamilyFilter
-          familias={familias}
-          selected={familia}
-          onSelect={setFamilia}
+        <SectionFilter
+          seccoes={seccoesComProdutos}
+          selected={seccaoAtiva}
+          onSelect={setSeccaoAtiva}
         />
       </div>
 
@@ -52,7 +57,7 @@ export function ProductCatalog({ perfumes }: ProductCatalogProps) {
           <PackageSearch className="h-10 w-10 text-gold-600" aria-hidden />
           <p className="text-sm">
             Nenhum perfume encontrado
-            {familia ? ` na família ${familia}` : ' no momento'}.
+            {tituloSeccaoAtiva ? ` em ${tituloSeccaoAtiva}` : ' no momento'}.
           </p>
         </div>
       ) : (

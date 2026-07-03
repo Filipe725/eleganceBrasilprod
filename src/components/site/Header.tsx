@@ -1,8 +1,9 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Leaf, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { STORE_NAME } from '@/lib/constants';
 import { CartButton } from '@/components/cart/CartButton';
 import { useSearchStore } from '@/store/search-store';
@@ -42,7 +43,7 @@ export function Header() {
           className="tap-target flex w-fit items-center justify-center gap-1.5 text-muted transition hover:text-ink-900"
           aria-label="Ver todos os produtos"
         >
-          <Leaf className="h-5 w-5" aria-hidden />
+          <img src="/icone.png" alt="" className="h-10 w-auto" aria-hidden="true" />
           <span className="hidden text-sm font-medium sm:inline">Produtos</span>
         </a>
 

@@ -16,11 +16,11 @@ export const WHATSAPP_NUMBER =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '';
 
 export const STORE_EMAIL =
-  process.env.NEXT_PUBLIC_STORE_EMAIL ?? 'contato@elegancebrasil.com.br';
+  process.env.NEXT_PUBLIC_STORE_EMAIL ?? 'elegancebrasilgaranhuns@gmail.com';
 
 export const STORE_ADDRESS =
   process.env.NEXT_PUBLIC_STORE_ADDRESS ??
-  'Av. Paulista, 1000 — São Paulo/SP';
+  'Garanhuns-PE';
 
 /** Links institucionais exibidos no footer e nas páginas estáticas. */
 export const INSTITUTIONAL_LINKS = [

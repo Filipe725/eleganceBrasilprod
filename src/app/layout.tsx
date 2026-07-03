@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   title: `${STORE_NAME} — Perfumaria de Luxo`,
   description:
     'Fragrâncias artesanais que unem a vitalidade da flora brasileira à sofisticação da alta perfumaria europeia. Monte seu pedido e finalize pelo WhatsApp.',
+  icons: {
+    icon: [
+      { url: '/favicon_io/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon_io/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    shortcut: '/favicon_io/favicon.ico',
+  },
 };
 
 export const viewport: Viewport = {

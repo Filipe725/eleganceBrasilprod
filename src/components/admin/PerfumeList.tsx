@@ -36,9 +36,9 @@ export function PerfumeList({
           }`}
         >
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-ink-800 to-ink-950 sm:h-20 sm:w-20">
-            {perfume.imagem_url ? (
+            {perfume.fotos[0] ? (
               <Image
-                src={perfume.imagem_url}
+                src={perfume.fotos[0]}
                 alt={perfume.nome}
                 fill
                 sizes="80px"

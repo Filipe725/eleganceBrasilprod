@@ -14,13 +14,14 @@ create table if not exists public.perfumes (
   id               uuid primary key default gen_random_uuid(),
   nome             text not null,
   marca            text not null default 'ÉléganceBrasil', -- ex: "Lancôme", "Giorgio Armani"
-  descricao        text,                          -- descrição detalhada
+  descricao        text,                          -- descrição detalhada (página de produto)
+  resumo           text check (resumo is null or char_length(resumo) <= 100), -- texto curto exibido no card da vitrine
   notas_olfativas  text,                          -- ex: "Topo: bergamota. Coração: âmbar. Fundo: baunilha."
   preco_antigo     numeric(10, 2) check (preco_antigo is null or preco_antigo >= 0), -- preço "de" (ancoragem)
   preco_atual      numeric(10, 2) not null check (preco_atual >= 0),                 -- preço "por"
   familia_olfativa text[] not null default '{}', -- ex: '{Amadeirado,Cítrico}' (perfume pode ter várias)
   tamanho          text[] not null default '{}', -- ex: '{50ml,100ml}'
-  imagem_url       text,                          -- URL pública do Supabase Storage
+  fotos            text[] not null default '{}', -- URLs públicas do Storage; fotos[0] é a capa
   tag_destaque     text,                          -- slug da secção da Home (ex: 'mais-vendidos') ou NULL
   ativo            boolean not null default true, -- permite "esconder" sem excluir
   created_at       timestamptz not null default now(),
@@ -35,6 +36,9 @@ alter table public.perfumes add column if not exists tag_destaque text;
 alter table public.perfumes add column if not exists preco_antigo numeric(10, 2);
 alter table public.perfumes add column if not exists marca text not null default 'ÉléganceBrasil';
 alter table public.perfumes add column if not exists tamanho text[] not null default '{}';
+alter table public.perfumes add column if not exists resumo text
+  check (resumo is null or char_length(resumo) <= 100);
+alter table public.perfumes add column if not exists fotos text[] not null default '{}';
 
 -- Migra projetos antigos: familia_olfativa era `text` (uma família só),
 -- agora é `text[]` (múltiplas famílias por perfume).
@@ -49,6 +53,21 @@ begin
       alter column familia_olfativa type text[] using array[familia_olfativa];
     alter table public.perfumes
       alter column familia_olfativa set default '{}';
+  end if;
+end $$;
+
+-- Migra projetos antigos: imagem_url (uma foto só) → fotos (galeria).
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'perfumes'
+      and column_name = 'imagem_url'
+  ) then
+    update public.perfumes
+      set fotos = array[imagem_url]
+      where imagem_url is not null and fotos = '{}';
+    alter table public.perfumes drop column imagem_url;
   end if;
 end $$;
 
@@ -209,22 +228,26 @@ on conflict (seccao) do nothing;
 -- 6. (Opcional) Perfumes de exemplo para testar a vitrine
 -- ------------------------------------------------------------
 insert into public.perfumes
-  (nome, marca, descricao, notas_olfativas, preco_antigo, preco_atual, familia_olfativa, tamanho, tag_destaque)
+  (nome, marca, descricao, resumo, notas_olfativas, preco_antigo, preco_atual, familia_olfativa, tamanho, tag_destaque)
 values
   ('Amazonia Gold', 'ÉléganceBrasil',
    'Fragrância marcante inspirada no entardecer da floresta.',
+   'Marcante e envolvente, para o entardecer da floresta.',
    'Topo: maracujá e bergamota. Coração: âmbar e patchouli. Fundo: baunilha e cedro.',
    600.00, 480.00, '{Amadeirado}', '{100ml}', 'mais-vendidos'),
   ('Orquídea Real', 'ÉléganceBrasil',
    'Delicado e sofisticado, um buquê tropical de luxo.',
+   'Delicado buquê tropical, sofisticado e floral.',
    'Topo: pera e frésia. Coração: orquídea branca e jasmim. Fundo: almíscar e sândalo.',
    null, 520.00, '{Floral}', '{75ml}', 'mais-vendidos'),
   ('Cacau Imperial', 'ÉléganceBrasil',
+   'Gourmand intenso com a alma do cacau brasileiro.',
    'Gourmand intenso com a alma do cacau brasileiro.',
    'Topo: açafrão. Coração: cacau e fava tonka. Fundo: baunilha e couro.',
    560.00, 450.00, '{Oriental}', '{50ml,100ml}', 'mega-ofertas'),
   ('Mata Atlântica', 'ÉléganceBrasil',
    'Frescor verde para o dia a dia.',
+   'Frescor verde e cítrico para o dia a dia.',
    'Topo: folhas verdes e limão siciliano. Coração: vetiver. Fundo: cedro e almíscar branco.',
    null, 390.00, '{Aromático,Cítrico}', '{50ml}', 'mega-ofertas');
 

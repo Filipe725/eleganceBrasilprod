@@ -2,13 +2,14 @@ export interface Perfume {
   id: string;
   nome: string;
   marca: string; // ex: "Lancôme", "Giorgio Armani"
-  descricao: string | null;
+  descricao: string | null; // descrição completa (página de produto)
+  resumo: string | null; // texto curto (~100 caracteres) exibido no card da vitrine
   notas_olfativas: string | null;
   preco_antigo: number | null; // preço "de" (ancoragem); opcional
   preco_atual: number; // preço "por" (vigente)
   familia_olfativa: string[]; // ex: ["Amadeirado", "Cítrico"]
   tamanho: string[]; // ex: ["50ml", "100ml"]
-  imagem_url: string | null;
+  fotos: string[]; // URLs da galeria; fotos[0] é a capa
   tag_destaque: string | null;
   ativo: boolean;
   created_at: string;
