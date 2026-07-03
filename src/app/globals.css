@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream text-charcoal antialiased;
+  }
+}
+
+@layer utilities {
+  /* Alvo de toque confortável no mobile (>= 44px, recomendação Apple/Google) */
+  .tap-target {
+    @apply min-h-[48px] min-w-[48px];
+  }
+}
