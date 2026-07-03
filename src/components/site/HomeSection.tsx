@@ -1,6 +1,6 @@
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { PromoBanner } from './PromoBanner';
-import { ProductCard } from './ProductCard';
+import { ProductGrid } from './ProductGrid';
 
 interface HomeSectionProps {
   seccao: BannerSeccao;
@@ -35,11 +35,7 @@ export function HomeSection({ seccao, perfumes }: HomeSectionProps) {
       <PromoBanner banner={seccao} />
 
       {perfumes.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 md:grid-cols-3 lg:grid-cols-4">
-          {perfumes.map((perfume) => (
-            <ProductCard key={perfume.id} perfume={perfume} />
-          ))}
-        </div>
+        <ProductGrid perfumes={perfumes} layout="carousel" />
       )}
     </section>
   );

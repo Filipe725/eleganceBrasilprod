@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { PackageSearch } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { SectionFilter } from './SectionFilter';
-import { ProductCard } from './ProductCard';
+import { ProductGrid } from './ProductGrid';
 
 interface ProductCatalogProps {
   perfumes: Perfume[];
@@ -61,11 +61,7 @@ export function ProductCatalog({ perfumes, seccoes }: ProductCatalogProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 md:grid-cols-3 lg:grid-cols-4">
-          {visiveis.map((perfume) => (
-            <ProductCard key={perfume.id} perfume={perfume} />
-          ))}
-        </div>
+        <ProductGrid perfumes={visiveis} layout="grid" />
       )}
     </section>
   );

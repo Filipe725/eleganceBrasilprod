@@ -17,4 +17,14 @@
   .tap-target {
     @apply min-h-[48px] min-w-[48px];
   }
+
+  /* Esconde a scrollbar nos carrosséis horizontais, mantendo o scroll funcional */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
