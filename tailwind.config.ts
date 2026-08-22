@@ -4,14 +4,14 @@ const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
-      // Paleta "L'Essence Botanique": verde botânico profundo,
+      // Paleta "L'Essence Botanique": azul marinho profundo,
       // dourado acetinado e creme (ver DESIGN.md do guia de estilo)
       colors: {
         ink: {
-          950: '#01140f', // green-black (superfícies mais escuras)
-          900: '#01261f', // primary — Botanical Green
-          800: '#1a3c34', // primary-container
-          700: '#43655c', // surface-tint / texto secundário
+          950: '#0b121c', // navy-black (superfícies mais escuras)
+          900: '#111c2a', // primary — Deep Navy
+          800: '#1e3049', // primary-container
+          700: '#4a5a72', // surface-tint / texto secundário
         },
         gold: {
           300: '#fed488', // secondary-container
@@ -34,8 +34,8 @@ const config: Config = {
         sans: ['var(--font-sans)', 'Montserrat', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        // "Ambient Softness": sombra difusa com tint de verde botânico
-        card: '0 10px 30px -10px rgba(1, 38, 31, 0.08)',
+        // "Ambient Softness": sombra difusa com tint de azul marinho
+        card: '0 10px 30px -10px rgba(17, 28, 42, 0.08)',
       },
       keyframes: {
         'slide-in': {
