@@ -121,8 +121,46 @@ create trigger banners_seccoes_updated_at
   for each row execute function public.handle_updated_at();
 
 -- ------------------------------------------------------------
--- 3. ROW LEVEL SECURITY (RLS)
---    Leitura pública; escrita apenas para usuários autenticados.
+-- 3. TABELA: admins
+--    Lista de usuários (auth.users.id) autorizados a escrever no
+--    catálogo. Substitui a checagem antiga "qualquer usuário
+--    autenticado pode escrever" por uma checagem de identidade real,
+--    que não depende de "Enable sign ups" estar desativado no painel.
+-- ------------------------------------------------------------
+create table if not exists public.admins (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.admins enable row level security;
+
+-- Cada admin só enxerga a própria linha (não expõe a lista completa).
+drop policy if exists "Admin enxerga sua própria linha" on public.admins;
+create policy "Admin enxerga sua própria linha"
+  on public.admins for select
+  to authenticated
+  using (user_id = auth.uid());
+
+-- security definer: roda com privilégio do dono da função, então
+-- consegue checar `admins` mesmo com RLS habilitado na tabela, sem
+-- precisar de uma policy pública de leitura para todo autenticado.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.admins where user_id = auth.uid()
+  );
+$$;
+
+grant execute on function public.is_admin() to authenticated;
+
+-- ------------------------------------------------------------
+-- 4. ROW LEVEL SECURITY (RLS)
+--    Leitura pública; escrita apenas para quem está em `admins`.
 -- ------------------------------------------------------------
 alter table public.perfumes enable row level security;
 alter table public.banners_seccoes enable row level security;
@@ -138,19 +176,19 @@ drop policy if exists "Admin pode inserir perfumes" on public.perfumes;
 create policy "Admin pode inserir perfumes"
   on public.perfumes for insert
   to authenticated
-  with check (true);
+  with check (public.is_admin());
 
 drop policy if exists "Admin pode atualizar perfumes" on public.perfumes;
 create policy "Admin pode atualizar perfumes"
   on public.perfumes for update
   to authenticated
-  using (true) with check (true);
+  using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "Admin pode excluir perfumes" on public.perfumes;
 create policy "Admin pode excluir perfumes"
   on public.perfumes for delete
   to authenticated
-  using (true);
+  using (public.is_admin());
 
 -- banners_seccoes
 drop policy if exists "Leitura pública de banners" on public.banners_seccoes;
@@ -163,22 +201,22 @@ drop policy if exists "Admin pode inserir banners" on public.banners_seccoes;
 create policy "Admin pode inserir banners"
   on public.banners_seccoes for insert
   to authenticated
-  with check (true);
+  with check (public.is_admin());
 
 drop policy if exists "Admin pode atualizar banners" on public.banners_seccoes;
 create policy "Admin pode atualizar banners"
   on public.banners_seccoes for update
   to authenticated
-  using (true) with check (true);
+  using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "Admin pode excluir banners" on public.banners_seccoes;
 create policy "Admin pode excluir banners"
   on public.banners_seccoes for delete
   to authenticated
-  using (true);
+  using (public.is_admin());
 
 -- ------------------------------------------------------------
--- 4. STORAGE: bucket público `perfumes`
+-- 5. STORAGE: bucket público `perfumes`
 --    (fotos de produto em / e banners em banners/)
 -- ------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -201,23 +239,23 @@ drop policy if exists "Admin pode enviar imagens" on storage.objects;
 create policy "Admin pode enviar imagens"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'perfumes');
+  with check (bucket_id = 'perfumes' and public.is_admin());
 
 drop policy if exists "Admin pode atualizar imagens" on storage.objects;
 create policy "Admin pode atualizar imagens"
   on storage.objects for update
   to authenticated
-  using (bucket_id = 'perfumes')
-  with check (bucket_id = 'perfumes');
+  using (bucket_id = 'perfumes' and public.is_admin())
+  with check (bucket_id = 'perfumes' and public.is_admin());
 
 drop policy if exists "Admin pode excluir imagens" on storage.objects;
 create policy "Admin pode excluir imagens"
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'perfumes');
+  using (bucket_id = 'perfumes' and public.is_admin());
 
 -- ------------------------------------------------------------
--- 5. Dados iniciais: secções padrão da Home
+-- 6. Dados iniciais: secções padrão da Home
 -- ------------------------------------------------------------
 insert into public.banners_seccoes (seccao, titulo, ordem) values
   ('mais-vendidos', 'OS MAIS VENDIDOS', 1),
@@ -225,7 +263,7 @@ insert into public.banners_seccoes (seccao, titulo, ordem) values
 on conflict (seccao) do nothing;
 
 -- ------------------------------------------------------------
--- 6. (Opcional) Perfumes de exemplo para testar a vitrine
+-- 7. (Opcional) Perfumes de exemplo para testar a vitrine
 -- ------------------------------------------------------------
 insert into public.perfumes
   (nome, marca, descricao, resumo, notas_olfativas, preco_antigo, preco_atual, familia_olfativa, tamanho, tag_destaque)
@@ -253,7 +291,16 @@ values
 
 -- ============================================================
 -- IMPORTANTE — Criar o usuário admin:
--- Authentication > Users > "Add user" (e-mail + senha).
--- Recomendado: desativar "Enable sign ups" em
--- Authentication > Providers > Email.
+-- 1. Authentication > Users > "Add user" (e-mail + senha).
+-- 2. Autorize esse usuário a escrever no catálogo rodando (troque
+--    o e-mail abaixo pelo e-mail cadastrado no passo 1):
+--
+--    insert into public.admins (user_id)
+--    select id from auth.users where email = 'seuemail@exemplo.com'
+--    on conflict (user_id) do nothing;
+--
+-- Sem essa linha, o login funciona mas toda escrita (criar/editar/
+-- excluir perfume ou banner, enviar imagem) é bloqueada pela RLS.
+-- Recomendado (defesa extra, não obrigatório): desativar
+-- "Enable sign ups" em Authentication > Providers > Email.
 -- ============================================================

@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import type { BannerSeccao } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { uploadImage } from '@/lib/upload';
+import { uploadImage, validateImageFile } from '@/lib/upload';
+import { isSafeLink } from '@/lib/link';
 
 interface BannerManagerProps {
   seccoes: BannerSeccao[];
@@ -189,8 +190,17 @@ function BannerCard({ seccao, onUpdated, onDelete, notify }: BannerCardProps) {
   ) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
+      event.target.value = '';
+      if (!file) return;
+
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        notify(`${file.name}: ${validationError}`);
+        return;
+      }
+
       setFile(file);
-      if (file) setPreview(URL.createObjectURL(file));
+      setPreview(URL.createObjectURL(file));
     };
   }
 
@@ -208,10 +218,18 @@ function BannerCard({ seccao, onUpdated, onDelete, notify }: BannerCardProps) {
   }
 
   async function handleSave() {
+    const linkTrimmed = link.trim();
+    if (linkTrimmed && !isSafeLink(linkTrimmed)) {
+      notify(
+        'Link inválido. Use uma âncora (ex.: #mega-ofertas), um caminho (ex.: /produtos) ou uma URL http(s).'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const patch: Partial<BannerSeccao> = {
-        link_destino: link.trim() || null,
+        link_destino: linkTrimmed || null,
       };
       if (desktopFile) {
         patch.imagem_desktop_url = await uploadImage(desktopFile, 'banners');

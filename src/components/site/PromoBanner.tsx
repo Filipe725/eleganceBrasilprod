@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import type { BannerSeccao } from '@/lib/types';
+import { isSafeLink } from '@/lib/link';
 
 interface PromoBannerProps {
   banner: BannerSeccao;
@@ -45,7 +46,7 @@ export function PromoBanner({ banner }: PromoBannerProps) {
     </>
   );
 
-  if (!banner.link_destino) {
+  if (!banner.link_destino || !isSafeLink(banner.link_destino)) {
     return <div className="mb-6">{images}</div>;
   }
 

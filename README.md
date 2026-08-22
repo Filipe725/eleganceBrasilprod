@@ -15,10 +15,22 @@ finaliza o pedido pelo **WhatsApp** (sem checkout de pagamento).
 
 1. Crie um projeto em [supabase.com](https://supabase.com).
 2. Abra o **SQL Editor** e execute o conteúdo de [`supabase/schema.sql`](supabase/schema.sql).
-   Isso cria a tabela `perfumes`, as políticas de RLS e o bucket `perfumes` no Storage.
+   Isso cria as tabelas `perfumes`, `banners_seccoes` e `admins`, as políticas de RLS
+   e o bucket `perfumes` no Storage. Se o projeto já rodou uma versão anterior do
+   schema (sem a tabela `admins`), execute em vez disso
+   [`supabase/migrations/003_admin_rls.sql`](supabase/migrations/003_admin_rls.sql).
 3. Crie o usuário admin em **Authentication → Users → Add user** (e-mail + senha).
-4. Recomendado: desative **Enable sign ups** em Authentication → Providers → Email,
-   para que ninguém consiga se cadastrar sozinho.
+4. **Obrigatório:** autorize esse usuário a escrever no catálogo — a RLS só libera
+   `insert`/`update`/`delete` para quem está na tabela `admins`. No SQL Editor:
+   ```sql
+   insert into public.admins (user_id)
+   select id from auth.users where email = 'seuemail@exemplo.com'
+   on conflict (user_id) do nothing;
+   ```
+   Sem esse passo, o login funciona mas toda escrita (perfumes, banners, upload de
+   imagem) é bloqueada.
+5. Recomendado (defesa extra, não obrigatório): desative **Enable sign ups** em
+   Authentication → Providers → Email, para que ninguém consiga se cadastrar sozinho.
 
 ### 2. Configurar variáveis de ambiente
 

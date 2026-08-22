@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { Loader2, Save, X, ImagePlus } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { FAMILIAS_OLFATIVAS } from '@/lib/constants';
-import { uploadImage } from '@/lib/upload';
+import { uploadImage, validateImageFile } from '@/lib/upload';
 
 export interface PerfumeFormData {
   nome: string;
@@ -96,12 +96,24 @@ export function PerfumeForm({
 
   function handleFotosChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
-    const novasFotos = files.map((file) => ({
+    event.target.value = '';
+
+    const validas: File[] = [];
+    for (const file of files) {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        setError(`${file.name}: ${validationError}`);
+        return;
+      }
+      validas.push(file);
+    }
+
+    setError(null);
+    const novasFotos = validas.map((file) => ({
       url: URL.createObjectURL(file),
       file,
     }));
     setFotos((prev) => [...prev, ...novasFotos]);
-    event.target.value = '';
   }
 
   function removeFoto(index: number) {
