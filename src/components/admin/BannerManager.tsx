@@ -81,13 +81,24 @@ export function BannerManager({
     }
 
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('banners_seccoes')
       .delete()
-      .eq('id', seccao.id);
+      .eq('id', seccao.id)
+      .select('id');
 
     if (error) {
       notify(`Erro ao excluir: ${error.message}`);
+      return;
+    }
+
+    // RLS bloqueia silenciosamente (0 linhas afetadas, sem erro) quando o
+    // usuário não está autorizado como admin — sem essa checagem a UI
+    // "excluiria" a secção localmente e ela voltaria após atualizar a página.
+    if (!data || data.length === 0) {
+      notify(
+        'Não foi possível excluir: seu usuário não tem permissão de admin no banco.'
+      );
       return;
     }
 

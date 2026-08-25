@@ -37,14 +37,38 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === '/admin/login';
+  // Destino do convite (`inviteUserByEmail`): a sessão só existe no
+  // navegador via token no hash da URL, que o servidor nunca recebe —
+  // por isso não dá pra exigir cookie de sessão aqui.
+  const isSetPasswordPage = pathname === '/admin/definir-senha';
 
-  if (pathname.startsWith('/admin') && !isLoginPage && !user) {
+  if (!pathname.startsWith('/admin')) {
+    return response;
+  }
+
+  if (!user) {
+    if (isLoginPage || isSetPasswordPage) return response;
     const url = request.nextUrl.clone();
     url.pathname = '/admin/login';
     return NextResponse.redirect(url);
   }
 
-  if (isLoginPage && user) {
+  // Estar logado não basta: só quem está na tabela `admins` pode usar o
+  // painel. Sem essa checagem, qualquer conta autenticada (não só admins)
+  // conseguia ver o dashboard — a RLS já bloqueava a escrita, mas não a
+  // leitura/exibição da tela.
+  const { data: isAdmin } = await supabase.rpc('is_admin');
+
+  if (!isAdmin) {
+    // evita loop de redirecionamento / deixa terminar o fluxo de convite
+    if (isLoginPage || isSetPasswordPage) return response;
+    const url = request.nextUrl.clone();
+    url.pathname = '/admin/login';
+    url.searchParams.set('erro', 'sem-permissao');
+    return NextResponse.redirect(url);
+  }
+
+  if (isLoginPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/admin';
     return NextResponse.redirect(url);

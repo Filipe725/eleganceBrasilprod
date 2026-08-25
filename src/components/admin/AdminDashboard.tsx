@@ -1,27 +1,33 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, SprayCan, Images } from 'lucide-react';
+import { Plus, SprayCan, Images, ShieldCheck } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import type { AdminUser } from '@/app/admin/actions';
 import { PerfumeForm, type PerfumeFormData } from './PerfumeForm';
 import { PerfumeList } from './PerfumeList';
 import { BannerManager } from './BannerManager';
+import { AdminUsersManager } from './AdminUsersManager';
 
 interface AdminDashboardProps {
   initialPerfumes: Perfume[];
   initialSeccoes: BannerSeccao[];
+  initialAdmins: AdminUser[];
+  currentUserId: string;
 }
 
-type Tab = 'perfumes' | 'banners';
+type Tab = 'perfumes' | 'banners' | 'admins';
 
 /**
- * Orquestra o painel: aba de perfumes (CRUD completo) e aba de
- * banners/secções da Home.
+ * Orquestra o painel: aba de perfumes (CRUD completo), aba de
+ * banners/secções da Home e aba de administradores.
  */
 export function AdminDashboard({
   initialPerfumes,
   initialSeccoes,
+  initialAdmins,
+  currentUserId,
 }: AdminDashboardProps) {
   const [tab, setTab] = useState<Tab>('perfumes');
   const [perfumes, setPerfumes] = useState<Perfume[]>(initialPerfumes);
@@ -75,13 +81,24 @@ export function AdminDashboard({
     }
 
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('perfumes')
       .delete()
-      .eq('id', perfume.id);
+      .eq('id', perfume.id)
+      .select('id');
 
     if (error) {
       notify(`Erro ao excluir: ${error.message}`);
+      return;
+    }
+
+    // RLS bloqueia silenciosamente (0 linhas afetadas, sem erro) quando o
+    // usuário não está autorizado como admin — sem essa checagem a UI
+    // "excluiria" o item localmente e ele voltaria após atualizar a página.
+    if (!data || data.length === 0) {
+      notify(
+        'Não foi possível excluir: seu usuário não tem permissão de admin no banco.'
+      );
       return;
     }
 
@@ -134,6 +151,14 @@ export function AdminDashboard({
         >
           <Images className="h-4 w-4" aria-hidden />
           Banners &amp; Secções
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('admins')}
+          className={tabClass(tab === 'admins')}
+        >
+          <ShieldCheck className="h-4 w-4" aria-hidden />
+          Admins
         </button>
       </div>
 
@@ -201,6 +226,14 @@ export function AdminDashboard({
         <BannerManager
           seccoes={seccoes}
           onChange={setSeccoes}
+          notify={notify}
+        />
+      )}
+
+      {tab === 'admins' && (
+        <AdminUsersManager
+          initialAdmins={initialAdmins}
+          currentUserId={currentUserId}
           notify={notify}
         />
       )}

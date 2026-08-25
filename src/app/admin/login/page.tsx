@@ -1,16 +1,29 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Lock, Loader2, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { STORE_NAME } from '@/lib/constants';
 
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminLoginForm />
+    </Suspense>
+  );
+}
+
+function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get('erro') === 'sem-permissao'
+      ? 'Este usuário não tem permissão de admin. Fale com quem administra o catálogo.'
+      : null
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
