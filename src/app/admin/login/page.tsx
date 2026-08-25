@@ -19,10 +19,13 @@ function AdminLoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const erro = searchParams.get('erro');
   const [error, setError] = useState<string | null>(
-    searchParams.get('erro') === 'sem-permissao'
+    erro === 'sem-permissao'
       ? 'Este usuário não tem permissão de admin. Fale com quem administra o catálogo.'
-      : null
+      : erro === 'config'
+        ? 'Não foi possível conectar ao banco de dados. Verifique as variáveis de ambiente do Supabase na hospedagem.'
+        : null
   );
   const [loading, setLoading] = useState(false);
 

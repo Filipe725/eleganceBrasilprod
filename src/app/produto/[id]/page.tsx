@@ -16,33 +16,43 @@ interface ProdutoPageProps {
 }
 
 async function getPerfume(id: string): Promise<Perfume | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('perfumes')
-    .select('*')
-    .eq('id', id)
-    .eq('ativo', true)
-    .single();
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('perfumes')
+      .select('*')
+      .eq('id', id)
+      .eq('ativo', true)
+      .single();
 
-  if (error || !data) return null;
-  return data;
+    if (error || !data) return null;
+    return data;
+  } catch {
+    // Supabase indisponível/mal configurado: cai no notFound() do caller
+    // em vez de derrubar a página com um erro genérico.
+    return null;
+  }
 }
 
 /** Perfumes com pelo menos uma família olfativa em comum, excluindo o atual. */
 async function getRelacionados(perfume: Perfume): Promise<Perfume[]> {
   if (perfume.familia_olfativa.length === 0) return [];
 
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from('perfumes')
-    .select('*')
-    .eq('ativo', true)
-    .neq('id', perfume.id)
-    .overlaps('familia_olfativa', perfume.familia_olfativa)
-    .limit(8);
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('perfumes')
+      .select('*')
+      .eq('ativo', true)
+      .neq('id', perfume.id)
+      .overlaps('familia_olfativa', perfume.familia_olfativa)
+      .limit(8);
 
-  if (error || !data) return [];
-  return data;
+    if (error || !data) return [];
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata({

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { AdminHeader } from '@/components/admin/AdminHeader';
@@ -8,35 +9,57 @@ import { getAdminUsers, type AdminUser } from './actions';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminPage() {
-  const supabase = createClient();
+  // Segunda camada de proteção além do middleware. Client/auth ficam fora
+  // do fluxo de redirect: se SUPABASE_URL/ANON_KEY estiverem ausentes ou
+  // erradas (ex.: variável de ambiente não configurada na hospedagem),
+  // isso lança erro — sem capturar aqui, o painel derrubava a página
+  // inteira em vez de mandar para o login.
+  let user: User | null = null;
+  let isAdmin = false;
+  let perfumes: Perfume[] = [];
+  let seccoes: BannerSeccao[] = [];
+  let configError = false;
 
-  // Segunda camada de proteção além do middleware
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = createClient();
 
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser();
+    user = fetchedUser;
+
+    if (user) {
+      const { data: adminCheck } = await supabase.rpc('is_admin');
+      isAdmin = Boolean(adminCheck);
+    }
+
+    if (user && isAdmin) {
+      const [perfumesRes, seccoesRes] = await Promise.all([
+        supabase
+          .from('perfumes')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('banners_seccoes')
+          .select('*')
+          .order('ordem', { ascending: true }),
+      ]);
+      perfumes = perfumesRes.data ?? [];
+      seccoes = seccoesRes.data ?? [];
+    }
+  } catch {
+    configError = true;
+  }
+
+  if (configError) {
+    redirect('/admin/login?erro=config');
+  }
   if (!user) {
     redirect('/admin/login');
   }
-
-  const { data: isAdmin } = await supabase.rpc('is_admin');
   if (!isAdmin) {
     redirect('/admin/login?erro=sem-permissao');
   }
-
-  const [perfumesRes, seccoesRes] = await Promise.all([
-    supabase
-      .from('perfumes')
-      .select('*')
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('banners_seccoes')
-      .select('*')
-      .order('ordem', { ascending: true }),
-  ]);
-
-  const perfumes: Perfume[] = perfumesRes.data ?? [];
-  const seccoes: BannerSeccao[] = seccoesRes.data ?? [];
 
   let admins: AdminUser[] = [];
   try {
