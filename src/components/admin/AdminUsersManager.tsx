@@ -30,16 +30,17 @@ export function AdminUsersManager({
     event.preventDefault();
     setError(null);
     setInviting(true);
-    try {
-      const newAdmin = await inviteAdmin(email);
-      setAdmins((current) => [...current, newAdmin]);
-      setEmail('');
-      notify(`Convite enviado para ${newAdmin.email}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao convidar admin.');
-    } finally {
-      setInviting(false);
+    const result = await inviteAdmin(email);
+    setInviting(false);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
     }
+
+    setAdmins((current) => [...current, result.data]);
+    setEmail('');
+    notify(`Convite enviado para ${result.data.email}.`);
   }
 
   async function handleRevoke(admin: AdminUser) {
@@ -52,15 +53,16 @@ export function AdminUsersManager({
     }
 
     setRevokingId(admin.user_id);
-    try {
-      await revokeAdmin(admin.user_id);
-      setAdmins((current) => current.filter((a) => a.user_id !== admin.user_id));
-      notify(`Permissão de admin removida de ${admin.email}.`);
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Erro ao remover admin.');
-    } finally {
-      setRevokingId(null);
+    const result = await revokeAdmin(admin.user_id);
+    setRevokingId(null);
+
+    if (!result.ok) {
+      notify(result.error);
+      return;
     }
+
+    setAdmins((current) => current.filter((a) => a.user_id !== admin.user_id));
+    notify(`Permissão de admin removida de ${admin.email}.`);
   }
 
   return (

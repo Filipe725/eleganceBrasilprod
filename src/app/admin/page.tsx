@@ -61,13 +61,10 @@ export default async function AdminPage() {
     redirect('/admin/login?erro=sem-permissao');
   }
 
-  let admins: AdminUser[] = [];
-  try {
-    admins = await getAdminUsers();
-  } catch {
-    // SUPABASE_SERVICE_ROLE_KEY ausente ou falha ao listar: a aba
-    // "Admins" fica vazia em vez de derrubar o painel inteiro.
-  }
+  // SUPABASE_SERVICE_ROLE_KEY ausente ou falha ao listar: a aba "Admins"
+  // fica vazia em vez de derrubar o painel inteiro.
+  const adminsResult = await getAdminUsers();
+  const admins: AdminUser[] = adminsResult.ok ? adminsResult.data : [];
 
   return (
     <div className="min-h-dvh bg-cream">
