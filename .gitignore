@@ -30,3 +30,6 @@ yarn-error.log*
 
 # relatórios exportados (regeneráveis via scripts/export-perfumes.mjs)
 /relatorio-perfumes.csv
+
+# planilha de dados usada só para gerar a migração 005 (já aplicada)
+/perfumes_genero.xlsx
