@@ -1,23 +1,36 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, SprayCan, Images, ShieldCheck } from 'lucide-react';
-import type { BannerSeccao, Perfume } from '@/lib/types';
+import { useMemo, useState } from 'react';
+import {
+  Plus,
+  SprayCan,
+  Images,
+  ShieldCheck,
+  GalleryHorizontal,
+  Search,
+  X,
+} from 'lucide-react';
+import type { BannerSeccao, HeroConfig, HeroSlide, Perfume } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { matchesSearch } from '@/store/search-store';
 import type { AdminUser } from '@/app/admin/actions';
 import { PerfumeForm, type PerfumeFormData } from './PerfumeForm';
 import { PerfumeList } from './PerfumeList';
 import { BannerManager } from './BannerManager';
+import { HeroManager } from './HeroManager';
 import { AdminUsersManager } from './AdminUsersManager';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminDashboardProps {
   initialPerfumes: Perfume[];
   initialSeccoes: BannerSeccao[];
+  initialHeroSlides: HeroSlide[];
+  initialHeroConfig: HeroConfig;
   initialAdmins: AdminUser[];
   currentUserId: string;
 }
 
-type Tab = 'perfumes' | 'banners' | 'admins';
+type Tab = 'perfumes' | 'banners' | 'hero' | 'admins';
 
 /**
  * Orquestra o painel: aba de perfumes (CRUD completo), aba de
@@ -26,15 +39,28 @@ type Tab = 'perfumes' | 'banners' | 'admins';
 export function AdminDashboard({
   initialPerfumes,
   initialSeccoes,
+  initialHeroSlides,
+  initialHeroConfig,
   initialAdmins,
   currentUserId,
 }: AdminDashboardProps) {
   const [tab, setTab] = useState<Tab>('perfumes');
   const [perfumes, setPerfumes] = useState<Perfume[]>(initialPerfumes);
   const [seccoes, setSeccoes] = useState<BannerSeccao[]>(initialSeccoes);
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(initialHeroSlides);
+  const [heroConfig, setHeroConfig] = useState<HeroConfig>(initialHeroConfig);
   const [editing, setEditing] = useState<Perfume | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [perfumeToDelete, setPerfumeToDelete] = useState<Perfume | null>(null);
+  const [deletingPerfume, setDeletingPerfume] = useState(false);
+  const [perfumeQuery, setPerfumeQuery] = useState('');
+
+  const perfumesFiltrados = useMemo(() => {
+    const q = perfumeQuery.trim();
+    if (!q) return perfumes;
+    return perfumes.filter((p) => matchesSearch(p, q));
+  }, [perfumes, perfumeQuery]);
 
   function notify(message: string) {
     setFeedback(message);
@@ -75,17 +101,19 @@ export function AdminDashboard({
     setEditing(null);
   }
 
-  async function handleDelete(perfume: Perfume) {
-    if (!window.confirm(`Excluir "${perfume.nome}"? Essa ação não pode ser desfeita.`)) {
-      return;
-    }
+  async function confirmDeletePerfume() {
+    if (!perfumeToDelete) return;
+    const perfume = perfumeToDelete;
 
+    setDeletingPerfume(true);
     const supabase = createClient();
     const { data, error } = await supabase
       .from('perfumes')
       .delete()
       .eq('id', perfume.id)
       .select('id');
+    setDeletingPerfume(false);
+    setPerfumeToDelete(null);
 
     if (error) {
       notify(`Erro ao excluir: ${error.message}`);
@@ -154,6 +182,14 @@ export function AdminDashboard({
         </button>
         <button
           type="button"
+          onClick={() => setTab('hero')}
+          className={tabClass(tab === 'hero')}
+        >
+          <GalleryHorizontal className="h-4 w-4" aria-hidden />
+          Hero &amp; Carrossel
+        </button>
+        <button
+          type="button"
           onClick={() => setTab('admins')}
           className={tabClass(tab === 'admins')}
         >
@@ -179,8 +215,13 @@ export function AdminDashboard({
                 Gerenciar perfumes
               </h1>
               <p className="text-sm text-ink-700/70">
-                {perfumes.length} produto{perfumes.length === 1 ? '' : 's'} cadastrado
-                {perfumes.length === 1 ? '' : 's'}
+                {perfumeQuery.trim()
+                  ? `${perfumesFiltrados.length} de ${perfumes.length} produto${
+                      perfumes.length === 1 ? '' : 's'
+                    }`
+                  : `${perfumes.length} produto${perfumes.length === 1 ? '' : 's'} cadastrado${
+                      perfumes.length === 1 ? '' : 's'
+                    }`}
               </p>
             </div>
             {!showForm && (
@@ -198,24 +239,56 @@ export function AdminDashboard({
             )}
           </div>
 
+          {!showForm && (
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-700/40"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={perfumeQuery}
+                onChange={(event) => setPerfumeQuery(event.target.value)}
+                placeholder="Buscar por nome, marca, gênero, nota ou família olfativa..."
+                aria-label="Buscar perfumes"
+                className="w-full rounded-xl border border-ink-700/20 bg-white py-3 pl-11 pr-11 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+              />
+              {perfumeQuery && (
+                <button
+                  type="button"
+                  onClick={() => setPerfumeQuery('')}
+                  aria-label="Limpar busca"
+                  className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-700/50 transition hover:bg-ink-900/5 hover:text-ink-900"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
+          )}
+
           {showForm ? (
             <PerfumeForm
               perfume={editing}
               seccoes={seccoes}
+              perfumes={perfumes}
               onSave={handleSave}
               onCancel={() => {
                 setShowForm(false);
                 setEditing(null);
               }}
             />
+          ) : perfumeQuery.trim() && perfumesFiltrados.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-ink-700/20 py-16 text-center text-sm text-ink-700/70">
+              Nenhum perfume encontrado para &ldquo;{perfumeQuery.trim()}&rdquo;.
+            </div>
           ) : (
             <PerfumeList
-              perfumes={perfumes}
+              perfumes={perfumesFiltrados}
               onEdit={(perfume) => {
                 setEditing(perfume);
                 setShowForm(true);
               }}
-              onDelete={handleDelete}
+              onDelete={setPerfumeToDelete}
               onToggleActive={handleToggleActive}
             />
           )}
@@ -230,11 +303,32 @@ export function AdminDashboard({
         />
       )}
 
+      {tab === 'hero' && (
+        <HeroManager
+          slides={heroSlides}
+          onChange={setHeroSlides}
+          config={heroConfig}
+          onConfigChange={setHeroConfig}
+          notify={notify}
+        />
+      )}
+
       {tab === 'admins' && (
         <AdminUsersManager
           initialAdmins={initialAdmins}
           currentUserId={currentUserId}
           notify={notify}
+        />
+      )}
+
+      {perfumeToDelete && (
+        <ConfirmDialog
+          title="Excluir perfume"
+          message={`Excluir "${perfumeToDelete.nome}"? Essa ação não pode ser desfeita.`}
+          confirmLabel="Excluir"
+          loading={deletingPerfume}
+          onConfirm={confirmDeletePerfume}
+          onCancel={() => setPerfumeToDelete(null)}
         />
       )}
     </div>

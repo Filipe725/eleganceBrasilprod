@@ -1,3 +1,5 @@
+export type Genero = 'Masculino' | 'Feminino' | 'Unissex';
+
 export interface Perfume {
   id: string;
   nome: string;
@@ -11,6 +13,7 @@ export interface Perfume {
   tamanho: string[]; // ex: ["50ml", "100ml"]
   fotos: string[]; // URLs da galeria; fotos[0] é a capa
   tag_destaque: string | null;
+  genero: Genero;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -27,6 +30,27 @@ export interface BannerSeccao {
   ordem: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface HeroSlide {
+  id: string;
+  titulo: string;
+  subtitulo: string | null;
+  texto_botao: string | null;
+  url_destino: string | null;
+  imagem_desktop_url: string | null; // arte larga, ex: 1920x600px
+  imagem_mobile_url: string | null; // arte vertical, ex: 800x1000px
+  ativo: boolean;
+  ordem: number;
+  agendamento_inicio: string | null; // ISO; slide só aparece a partir desta data/hora
+  agendamento_fim: string | null; // ISO; slide some após esta data/hora
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HeroConfig {
+  intervalo_segundos: number;
+  autoplay_ativo: boolean;
 }
 
 export interface CartItem {

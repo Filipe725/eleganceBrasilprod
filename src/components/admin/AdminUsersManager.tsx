@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { Loader2, Mail, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import { inviteAdmin, revokeAdmin, type AdminUser } from '@/app/admin/actions';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminUsersManagerProps {
   initialAdmins: AdminUser[];
@@ -25,44 +26,58 @@ export function AdminUsersManager({
   const [inviting, setInviting] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [adminToRevoke, setAdminToRevoke] = useState<AdminUser | null>(null);
 
   async function handleInvite(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setInviting(true);
-    const result = await inviteAdmin(email);
-    setInviting(false);
+    try {
+      const result = await inviteAdmin(email);
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      setAdmins((current) => [...current, result.data]);
+      setEmail('');
+      notify(`Convite enviado para ${result.data.email}.`);
+    } catch {
+      // Falha de rede antes mesmo de chegar ao servidor (extensão do
+      // navegador interceptando o fetch, conexão caiu, etc.) — sem esse
+      // catch, essa exceção derruba a tela com um erro genérico do Next.
+      setError(
+        'Falha de rede ao enviar o convite. Verifique a conexão (ou desative extensões do navegador que possam estar bloqueando requisições) e tente novamente.'
+      );
+    } finally {
+      setInviting(false);
     }
-
-    setAdmins((current) => [...current, result.data]);
-    setEmail('');
-    notify(`Convite enviado para ${result.data.email}.`);
   }
 
-  async function handleRevoke(admin: AdminUser) {
-    if (
-      !window.confirm(
-        `Remover a permissão de admin de "${admin.email}"? A conta continua existindo, só perde acesso ao painel.`
-      )
-    ) {
-      return;
-    }
+  async function confirmRevoke() {
+    if (!adminToRevoke) return;
+    const admin = adminToRevoke;
 
     setRevokingId(admin.user_id);
-    const result = await revokeAdmin(admin.user_id);
-    setRevokingId(null);
+    try {
+      const result = await revokeAdmin(admin.user_id);
 
-    if (!result.ok) {
-      notify(result.error);
-      return;
+      if (!result.ok) {
+        notify(result.error);
+        return;
+      }
+
+      setAdmins((current) => current.filter((a) => a.user_id !== admin.user_id));
+      notify(`Permissão de admin removida de ${admin.email}.`);
+    } catch {
+      notify(
+        'Falha de rede ao remover o acesso. Verifique a conexão (ou desative extensões do navegador que possam estar bloqueando requisições) e tente novamente.'
+      );
+    } finally {
+      setRevokingId(null);
+      setAdminToRevoke(null);
     }
-
-    setAdmins((current) => current.filter((a) => a.user_id !== admin.user_id));
-    notify(`Permissão de admin removida de ${admin.email}.`);
   }
 
   return (
@@ -134,7 +149,7 @@ export function AdminUsersManager({
             ) : (
               <button
                 type="button"
-                onClick={() => handleRevoke(admin)}
+                onClick={() => setAdminToRevoke(admin)}
                 disabled={revokingId === admin.user_id}
                 className="tap-target inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-4 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
               >
@@ -149,6 +164,17 @@ export function AdminUsersManager({
           </li>
         ))}
       </ul>
+
+      {adminToRevoke && (
+        <ConfirmDialog
+          title="Remover acesso de admin"
+          message={`Remover a permissão de admin de "${adminToRevoke.email}"? A conta continua existindo, só perde acesso ao painel.`}
+          confirmLabel="Remover acesso"
+          loading={revokingId === adminToRevoke.user_id}
+          onConfirm={confirmRevoke}
+          onCancel={() => setAdminToRevoke(null)}
+        />
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ interface ProductsExplorerProps {
 }
 
 export const EMPTY_FILTERS: Filters = {
+  generos: [],
   familias: [],
   tamanhos: [],
   marcas: [],
@@ -43,11 +44,13 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
 
   // Opções dos filtros derivadas do catálogo inicial completo
   const facets = useMemo(() => {
+    const generos = new Set<string>();
     const familias = new Set<string>();
     const tamanhos = new Set<string>();
     const marcas = new Set<string>();
     let max = 0;
     for (const p of initialPerfumes) {
+      generos.add(p.genero);
       p.familia_olfativa.forEach((f) => familias.add(f));
       p.tamanho.forEach((t) => tamanhos.add(t));
       marcas.add(p.marca);
@@ -55,6 +58,7 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
     }
     const sortPt = (a: string, b: string) => a.localeCompare(b, 'pt-BR');
     return {
+      generos: Array.from(generos).sort(sortPt),
       familias: Array.from(familias).sort(sortPt),
       tamanhos: Array.from(tamanhos).sort(sortPt),
       marcas: Array.from(marcas).sort(sortPt),
@@ -63,6 +67,7 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
   }, [initialPerfumes]);
 
   const activeFilterCount =
+    filters.generos.length +
     filters.familias.length +
     filters.tamanhos.length +
     filters.marcas.length +
@@ -75,6 +80,9 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
       const supabase = createClient();
       let query = supabase.from('perfumes').select('*').eq('ativo', true);
 
+      if (nextFilters.generos.length > 0) {
+        query = query.in('genero', nextFilters.generos);
+      }
       if (nextFilters.familias.length > 0) {
         // coluna text[]: qualquer interseção com as famílias marcadas
         query = query.overlaps('familia_olfativa', nextFilters.familias);
@@ -146,7 +154,7 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
       </h1>
 
       {/* Barra sticky: Ordenar / Filtrar */}
-      <div className="sticky top-16 z-20 -mx-5 mb-6 border-y border-gold-400/20 bg-cream/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+      <div className="sticky top-[108px] z-20 -mx-5 mb-6 border-y border-gold-400/20 bg-cream/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"

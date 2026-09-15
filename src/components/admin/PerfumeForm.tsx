@@ -1,11 +1,19 @@
 'use client';
 
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ChangeEvent,
+} from 'react';
 import Image from 'next/image';
-import { Loader2, Save, X, ImagePlus } from 'lucide-react';
-import type { BannerSeccao, Perfume } from '@/lib/types';
+import { Loader2, Save, X, ImagePlus, ChevronDown } from 'lucide-react';
+import type { BannerSeccao, Genero, Perfume } from '@/lib/types';
 import { FAMILIAS_OLFATIVAS } from '@/lib/constants';
 import { uploadImage, validateImageFile } from '@/lib/upload';
+import { MultiSelectDropdown } from './MultiSelectDropdown';
 
 export interface PerfumeFormData {
   nome: string;
@@ -19,12 +27,14 @@ export interface PerfumeFormData {
   tamanho: string[];
   fotos: string[];
   tag_destaque: string | null;
+  genero: Genero;
   ativo: boolean;
 }
 
 interface PerfumeFormProps {
   perfume: Perfume | null; // null = criação; preenchido = edição
   seccoes: BannerSeccao[]; // secções da Home disponíveis para o tag_destaque
+  perfumes: Perfume[]; // catálogo atual, usado para aprender famílias olfativas já cadastradas
   onSave: (data: PerfumeFormData) => Promise<void>;
   onCancel: () => void;
 }
@@ -37,17 +47,171 @@ interface FotoItem {
 const inputClass =
   'w-full rounded-xl border border-ink-700/20 bg-white px-4 py-3 text-ink-900 placeholder:text-ink-700/40 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600';
 
+const GENEROS: Genero[] = ['Masculino', 'Feminino', 'Unissex'];
+
+/** Mantém só dígitos e um único separador decimal (, ou .) — usado no preço. */
+function sanitizeDecimalInput(value: string): string {
+  const cleaned = value.replace(/[^0-9.,]/g, '');
+  const sepMatch = cleaned.match(/[.,]/);
+  if (!sepMatch) return cleaned;
+  const sepIndex = cleaned.indexOf(sepMatch[0]);
+  return (
+    cleaned.slice(0, sepIndex + 1) +
+    cleaned.slice(sepIndex + 1).replace(/[.,]/g, '')
+  );
+}
+
+/** Mantém só dígitos, vírgulas e espaços — usado na lista de tamanhos. */
+function sanitizeSizesInput(value: string): string {
+  return value.replace(/[^0-9,\s]/g, '');
+}
+
+/** Junta uma lista em texto natural: "a", "a e b", "a, b e c". */
+function joinComE(valores: string[]): string {
+  if (valores.length <= 1) return valores[0] ?? '';
+  return `${valores.slice(0, -1).join(', ')} e ${valores[valores.length - 1]}`;
+}
+
+interface NotasParseadas {
+  topo: string[];
+  coracao: string[];
+  fundo: string[];
+}
+
+const NOTAS_VAZIAS: NotasParseadas = { topo: [], coracao: [], fundo: [] };
+
+/**
+ * Extrai listas de Topo/Coração/Fundo de um texto livre de notas
+ * olfativas — best-effort, cobrindo tanto o formato novo ("Nota de
+ * Topo: a, b e c") quanto formatos antigos já salvos no catálogo
+ * ("Topo: a. Coração: b. Fundo: c." ou "• Notas de topo: a, b e c").
+ * Falhar em reconhecer o texto só significa campos vazios no formulário
+ * (o admin pode reselecionar) — nunca quebra a edição.
+ */
+function parseNotas(raw: string | null | undefined): NotasParseadas {
+  if (!raw) return NOTAS_VAZIAS;
+
+  const texto = raw.replace(/notas?\s+de\s+/gi, '').replace(/[•·]/g, '');
+
+  function extrair(label: string, outros: string[]): string[] {
+    const pattern = new RegExp(
+      `${label}\\s*:\\s*(.*?)(?=(?:${outros.join('|')})\\s*:|$)`,
+      'is'
+    );
+    const match = texto.match(pattern);
+    if (!match) return [];
+    return match[1]
+      .trim()
+      .replace(/\.+$/, '')
+      .split(/,| e /i)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  return {
+    topo: extrair('topo', ['cora[cç][aã]o', 'fundo']),
+    coracao: extrair('cora[cç][aã]o', ['fundo', 'topo']),
+    fundo: extrair('fundo', ['topo', 'cora[cç][aã]o']),
+  };
+}
+
 export function PerfumeForm({
   perfume,
   seccoes,
+  perfumes,
   onSave,
   onCancel,
 }: PerfumeFormProps) {
   const [nome, setNome] = useState(perfume?.nome ?? '');
   const [marca, setMarca] = useState(perfume?.marca ?? '');
+  // Marcas digitadas nesta sessão via "Adicionar" que ainda não existem em
+  // nenhum perfume salvo — assim que o perfume é salvo, elas passam a vir
+  // naturalmente de `perfumes` e aparecem para qualquer outro cadastro.
+  const [extraMarcas, setExtraMarcas] = useState<string[]>([]);
+  const [novaMarca, setNovaMarca] = useState('');
+  const [marcaOpen, setMarcaOpen] = useState(false);
+  const marcaRef = useRef<HTMLDivElement>(null);
+
+  const marcasDisponiveis = useMemo(() => {
+    const conhecidas = new Set<string>();
+    for (const p of perfumes) if (p.marca) conhecidas.add(p.marca);
+    for (const m of extraMarcas) conhecidas.add(m);
+    return Array.from(conhecidas).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [perfumes, extraMarcas]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (marcaRef.current && !marcaRef.current.contains(event.target as Node)) {
+        setMarcaOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function selectMarca(valor: string) {
+    setMarca(valor);
+    setMarcaOpen(false);
+  }
+
+  function handleAddMarca() {
+    const valor = novaMarca.trim();
+    if (!valor) return;
+    setExtraMarcas((prev) => (prev.includes(valor) ? prev : [...prev, valor]));
+    setMarca(valor);
+    setNovaMarca('');
+    setMarcaOpen(false);
+  }
+
   const [descricao, setDescricao] = useState(perfume?.descricao ?? '');
   const [resumo, setResumo] = useState(perfume?.resumo ?? '');
-  const [notas, setNotas] = useState(perfume?.notas_olfativas ?? '');
+
+  const notasIniciais = parseNotas(perfume?.notas_olfativas);
+  const [notasTopo, setNotasTopo] = useState<string[]>(notasIniciais.topo);
+  const [notasCoracao, setNotasCoracao] = useState<string[]>(notasIniciais.coracao);
+  const [notasFundo, setNotasFundo] = useState<string[]>(notasIniciais.fundo);
+  // Notas digitadas nesta sessão via "Adicionar" que ainda não existem em
+  // nenhum perfume salvo — mesmo esquema de aprendizado da família/marca.
+  const [extraNotasTopo, setExtraNotasTopo] = useState<string[]>([]);
+  const [extraNotasCoracao, setExtraNotasCoracao] = useState<string[]>([]);
+  const [extraNotasFundo, setExtraNotasFundo] = useState<string[]>([]);
+
+  const notasExistentes = useMemo(() => {
+    const topo = new Set<string>();
+    const coracao = new Set<string>();
+    const fundo = new Set<string>();
+    for (const p of perfumes) {
+      const parsed = parseNotas(p.notas_olfativas);
+      parsed.topo.forEach((v) => topo.add(v));
+      parsed.coracao.forEach((v) => coracao.add(v));
+      parsed.fundo.forEach((v) => fundo.add(v));
+    }
+    return {
+      topo: Array.from(topo),
+      coracao: Array.from(coracao),
+      fundo: Array.from(fundo),
+    };
+  }, [perfumes]);
+
+  const sortPt = (a: string, b: string) => a.localeCompare(b, 'pt-BR');
+  const notasTopoDisponiveis = useMemo(
+    () =>
+      Array.from(new Set([...notasExistentes.topo, ...extraNotasTopo])).sort(sortPt),
+    [notasExistentes, extraNotasTopo]
+  );
+  const notasCoracaoDisponiveis = useMemo(
+    () =>
+      Array.from(new Set([...notasExistentes.coracao, ...extraNotasCoracao])).sort(
+        sortPt
+      ),
+    [notasExistentes, extraNotasCoracao]
+  );
+  const notasFundoDisponiveis = useMemo(
+    () =>
+      Array.from(new Set([...notasExistentes.fundo, ...extraNotasFundo])).sort(sortPt),
+    [notasExistentes, extraNotasFundo]
+  );
+
   const [aplicarDesconto, setAplicarDesconto] = useState(
     perfume?.preco_antigo != null
   );
@@ -64,28 +228,22 @@ export function PerfumeForm({
   const [tamanho, setTamanho] = useState(tamanhoInicial);
 
   const familiaOlfativaInicial = perfume?.familia_olfativa ?? [];
-  const [familias, setFamilias] = useState<string[]>(
-    familiaOlfativaInicial.filter((f) =>
-      (FAMILIAS_OLFATIVAS as readonly string[]).includes(f)
-    )
-  );
-  const familiaCustomInicial = familiaOlfativaInicial.filter(
-    (f) => !(FAMILIAS_OLFATIVAS as readonly string[]).includes(f)
-  );
-  const [outroChecked, setOutroChecked] = useState(
-    familiaCustomInicial.length > 0
-  );
-  const [familiaCustom, setFamiliaCustom] = useState(
-    familiaCustomInicial.join(', ')
-  );
+  const [familias, setFamilias] = useState<string[]>(familiaOlfativaInicial);
+  // Famílias digitadas nesta sessão via "Adicionar" que ainda não existem em
+  // nenhum perfume salvo — assim que o perfume é salvo, elas passam a vir
+  // naturalmente de `perfumes` e aparecem para qualquer outro cadastro.
+  const [extraFamilias, setExtraFamilias] = useState<string[]>([]);
 
-  function toggleFamilia(familia: string) {
-    setFamilias((prev) =>
-      prev.includes(familia)
-        ? prev.filter((f) => f !== familia)
-        : [...prev, familia]
-    );
-  }
+  const familiasDisponiveis = useMemo(() => {
+    const conhecidas = new Set<string>(FAMILIAS_OLFATIVAS);
+    for (const p of perfumes) {
+      for (const f of p.familia_olfativa) conhecidas.add(f);
+    }
+    for (const f of extraFamilias) conhecidas.add(f);
+    return Array.from(conhecidas).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [perfumes, extraFamilias]);
+
+  const [genero, setGenero] = useState<Genero>(perfume?.genero ?? 'Unissex');
   const [tagDestaque, setTagDestaque] = useState(perfume?.tag_destaque ?? '');
   const [ativo, setAtivo] = useState(perfume?.ativo ?? true);
   const [fotos, setFotos] = useState<FotoItem[]>(
@@ -169,17 +327,18 @@ export function PerfumeForm({
       return;
     }
 
-    const familiaCustomValues = outroChecked
-      ? familiaCustom
-          .split(',')
-          .map((f) => f.trim())
-          .filter(Boolean)
-      : [];
-    const familiaFinal = [...familias, ...familiaCustomValues];
-    if (familiaFinal.length === 0) {
+    if (familias.length === 0) {
       setError('Selecione ao menos uma família olfativa.');
       return;
     }
+
+    const notasFinal = [
+      notasTopo.length > 0 ? `Nota de Topo: ${joinComE(notasTopo)}` : null,
+      notasCoracao.length > 0 ? `Nota de Coração: ${joinComE(notasCoracao)}` : null,
+      notasFundo.length > 0 ? `Nota de Fundo: ${joinComE(notasFundo)}` : null,
+    ]
+      .filter((linha): linha is string => linha !== null)
+      .join('\n');
 
     setSaving(true);
     try {
@@ -192,13 +351,14 @@ export function PerfumeForm({
         marca: marca.trim(),
         descricao: descricao.trim(),
         resumo: resumo.trim() || null,
-        notas_olfativas: notas.trim(),
+        notas_olfativas: notasFinal,
         preco_antigo: precoAntigoNumber,
         preco_atual: precoAtualNumber,
-        familia_olfativa: familiaFinal,
+        familia_olfativa: familias,
         tamanho: tamanhos,
         fotos: fotosFinal,
         tag_destaque: tagDestaque || null,
+        genero,
         ativo,
       });
     } catch (err) {
@@ -295,18 +455,76 @@ export function PerfumeForm({
           />
         </div>
 
-        <div>
-          <label htmlFor="marca" className="mb-1.5 block text-sm font-medium text-ink-800">
+        <div ref={marcaRef}>
+          <span className="mb-1.5 block text-sm font-medium text-ink-800">
             Marca *
-          </label>
-          <input
-            id="marca"
-            required
-            value={marca}
-            onChange={(event) => setMarca(event.target.value)}
-            className={inputClass}
-            placeholder="Ex.: Lancôme, Giorgio Armani"
-          />
+          </span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMarcaOpen((v) => !v)}
+              aria-expanded={marcaOpen}
+              className={`${inputClass} flex items-center justify-between gap-2 text-left`}
+            >
+              <span className={`truncate ${!marca ? 'text-ink-700/40' : ''}`}>
+                {marca || 'Selecione a marca'}
+              </span>
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 text-ink-700/60 transition-transform ${
+                  marcaOpen ? 'rotate-180' : ''
+                }`}
+                aria-hidden
+              />
+            </button>
+
+            {marcaOpen && (
+              <div className="absolute z-10 mt-2 w-full rounded-xl border border-ink-700/15 bg-white p-3 shadow-card">
+                <div className="max-h-52 space-y-0.5 overflow-y-auto">
+                  {marcasDisponiveis.length === 0 ? (
+                    <p className="px-2 py-1.5 text-sm text-ink-700/50">
+                      Nenhuma marca cadastrada ainda.
+                    </p>
+                  ) : (
+                    marcasDisponiveis.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => selectMarca(m)}
+                        className={`flex w-full items-center rounded-lg px-2 py-1.5 text-left text-sm transition hover:bg-cream ${
+                          marca === m
+                            ? 'bg-gold-500/10 font-semibold text-ink-900'
+                            : 'text-ink-800'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div className="mt-2 flex gap-2 border-t border-ink-700/10 pt-2">
+                  <input
+                    value={novaMarca}
+                    onChange={(event) => setNovaMarca(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleAddMarca();
+                      }
+                    }}
+                    placeholder="Outra marca..."
+                    className="w-full rounded-lg border border-ink-700/20 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddMarca}
+                    className="shrink-0 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-cream transition hover:bg-ink-800"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
@@ -318,7 +536,7 @@ export function PerfumeForm({
             required
             inputMode="decimal"
             value={precoBase}
-            onChange={(event) => setPrecoBase(event.target.value)}
+            onChange={(event) => setPrecoBase(sanitizeDecimalInput(event.target.value))}
             className={inputClass}
             placeholder="199.90"
           />
@@ -344,7 +562,9 @@ export function PerfumeForm({
                 required
                 inputMode="decimal"
                 value={precoComDesconto}
-                onChange={(event) => setPrecoComDesconto(event.target.value)}
+                onChange={(event) =>
+                  setPrecoComDesconto(sanitizeDecimalInput(event.target.value))
+                }
                 className={inputClass}
                 placeholder="Ex.: 149.90"
               />
@@ -359,60 +579,49 @@ export function PerfumeForm({
           <input
             id="tamanho"
             required
+            inputMode="numeric"
             value={tamanho}
-            onChange={(event) => setTamanho(event.target.value)}
+            onChange={(event) => setTamanho(sanitizeSizesInput(event.target.value))}
             className={inputClass}
             placeholder="Ex.: 50, 100, 200"
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div>
           <span className="mb-1.5 block text-sm font-medium text-ink-800">
-            Família olfativa * (selecione uma ou mais)
+            Gênero *
           </span>
-          <div className="flex flex-wrap gap-2">
-            {FAMILIAS_OLFATIVAS.map((f) => (
-              <label
-                key={f}
-                className={`cursor-pointer rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                  familias.includes(f)
-                    ? 'border-ink-900 bg-ink-900 text-white'
-                    : 'border-ink-700/25 bg-white text-ink-800 hover:border-ink-900'
+          <div className="inline-flex w-full rounded-xl border border-ink-700/20 bg-white p-1">
+            {GENEROS.map((g) => (
+              <button
+                key={g}
+                type="button"
+                aria-pressed={genero === g}
+                onClick={() => setGenero(g)}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  genero === g
+                    ? 'bg-ink-900 text-cream'
+                    : 'text-ink-700 hover:bg-ink-900/5'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={familias.includes(f)}
-                  onChange={() => toggleFamilia(f)}
-                  className="sr-only"
-                />
-                {f}
-              </label>
+                {g}
+              </button>
             ))}
-            <label
-              className={`cursor-pointer rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                outroChecked
-                  ? 'border-ink-900 bg-ink-900 text-white'
-                  : 'border-ink-700/25 bg-white text-ink-800 hover:border-ink-900'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={outroChecked}
-                onChange={(event) => setOutroChecked(event.target.checked)}
-                className="sr-only"
-              />
-              Outro
-            </label>
           </div>
-          {outroChecked && (
-            <input
-              value={familiaCustom}
-              onChange={(event) => setFamiliaCustom(event.target.value)}
-              className={`${inputClass} mt-2`}
-              placeholder="Digite a família olfativa (separe por vírgula se houver mais de uma)"
-            />
-          )}
+        </div>
+
+        <div className="sm:col-span-2">
+          <MultiSelectDropdown
+            label="Família olfativa * (selecione uma ou mais)"
+            placeholder="Selecione as famílias olfativas"
+            options={familiasDisponiveis}
+            selected={familias}
+            onChange={setFamilias}
+            onAddOption={(valor) =>
+              setExtraFamilias((prev) => (prev.includes(valor) ? prev : [...prev, valor]))
+            }
+            addPlaceholder="Outra família..."
+          />
         </div>
 
         <div className="sm:col-span-2">
@@ -470,17 +679,46 @@ export function PerfumeForm({
         </div>
 
         <div className="sm:col-span-2">
-          <label htmlFor="notas" className="mb-1.5 block text-sm font-medium text-ink-800">
+          <span className="mb-1.5 block text-sm font-medium text-ink-800">
             Notas olfativas
-          </label>
-          <textarea
-            id="notas"
-            rows={2}
-            value={notas}
-            onChange={(event) => setNotas(event.target.value)}
-            className={inputClass}
-            placeholder="Ex.: Topo: bergamota. Coração: âmbar. Fundo: baunilha e cedro."
-          />
+          </span>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <MultiSelectDropdown
+              label="Nota de Topo"
+              placeholder="Selecione as notas de topo"
+              options={notasTopoDisponiveis}
+              selected={notasTopo}
+              onChange={setNotasTopo}
+              onAddOption={(valor) =>
+                setExtraNotasTopo((prev) => (prev.includes(valor) ? prev : [...prev, valor]))
+              }
+              addPlaceholder="Outra nota..."
+            />
+            <MultiSelectDropdown
+              label="Nota de Coração"
+              placeholder="Selecione as notas de coração"
+              options={notasCoracaoDisponiveis}
+              selected={notasCoracao}
+              onChange={setNotasCoracao}
+              onAddOption={(valor) =>
+                setExtraNotasCoracao((prev) =>
+                  prev.includes(valor) ? prev : [...prev, valor]
+                )
+              }
+              addPlaceholder="Outra nota..."
+            />
+            <MultiSelectDropdown
+              label="Nota de Fundo"
+              placeholder="Selecione as notas de fundo"
+              options={notasFundoDisponiveis}
+              selected={notasFundo}
+              onChange={setNotasFundo}
+              onAddOption={(valor) =>
+                setExtraNotasFundo((prev) => (prev.includes(valor) ? prev : [...prev, valor]))
+              }
+              addPlaceholder="Outra nota..."
+            />
+          </div>
         </div>
       </div>
 

@@ -16,7 +16,8 @@ interface HomeContentProps {
 /**
  * Corpo da Home. Quando a busca do header está ativa, substitui as
  * secções pelo grid de resultados filtrado em tempo real
- * (case-insensitive em nome, notas olfativas e marca).
+ * (case-insensitive em nome, marca, família olfativa, notas olfativas
+ * e tamanho).
  */
 export function HomeContent({ perfumes, seccoes }: HomeContentProps) {
   const query = useSearchStore((state) => state.query);

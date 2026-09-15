@@ -16,7 +16,7 @@ export function PageShell({ title, subtitle, children }: PageShellProps) {
   return (
     <>
       <Header />
-      <main className="pt-16">
+      <main className="pt-[108px]">
         <div className="bg-cream-low">
           <div className="mx-auto max-w-3xl px-5 py-12 text-center sm:px-6 sm:py-16">
             <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-4xl">

@@ -15,6 +15,7 @@ import type { BannerSeccao } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { uploadImage, validateImageFile } from '@/lib/upload';
 import { isSafeLink } from '@/lib/link';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface BannerManagerProps {
   seccoes: BannerSeccao[];
@@ -43,6 +44,8 @@ export function BannerManager({
 }: BannerManagerProps) {
   const [novoTitulo, setNovoTitulo] = useState('');
   const [creating, setCreating] = useState(false);
+  const [seccaoToDelete, setSeccaoToDelete] = useState<BannerSeccao | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleCreate() {
     const titulo = novoTitulo.trim();
@@ -71,21 +74,19 @@ export function BannerManager({
     notify('Secção criada! Agora envie as artes do banner.');
   }
 
-  async function handleDelete(seccao: BannerSeccao) {
-    if (
-      !window.confirm(
-        `Excluir a secção "${seccao.titulo}"? Os perfumes marcados com ela voltam a aparecer apenas no catálogo geral.`
-      )
-    ) {
-      return;
-    }
+  async function confirmDelete() {
+    if (!seccaoToDelete) return;
+    const seccao = seccaoToDelete;
 
+    setDeleting(true);
     const supabase = createClient();
     const { data, error } = await supabase
       .from('banners_seccoes')
       .delete()
       .eq('id', seccao.id)
       .select('id');
+    setDeleting(false);
+    setSeccaoToDelete(null);
 
     if (error) {
       notify(`Erro ao excluir: ${error.message}`);
@@ -156,11 +157,22 @@ export function BannerManager({
               key={seccao.id}
               seccao={seccao}
               onUpdated={handleUpdated}
-              onDelete={() => handleDelete(seccao)}
+              onDelete={() => setSeccaoToDelete(seccao)}
               notify={notify}
             />
           ))}
         </ul>
+      )}
+
+      {seccaoToDelete && (
+        <ConfirmDialog
+          title="Excluir secção"
+          message={`Excluir a secção "${seccaoToDelete.titulo}"? Os perfumes marcados com ela voltam a aparecer apenas no catálogo geral.`}
+          confirmLabel="Excluir"
+          loading={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setSeccaoToDelete(null)}
+        />
       )}
     </div>
   );

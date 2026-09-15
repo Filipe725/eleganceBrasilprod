@@ -93,6 +93,27 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
 
     const admin = createAdminClient();
 
+    // Convidar um e-mail que já tem conta não cria um usuário novo: o
+    // Supabase reenvia um link de recovery para a conta EXISTENTE, que
+    // troca a senha dela silenciosamente quando o link é usado — sem
+    // essa checagem, um erro de digitação (ou reenvio para o mesmo
+    // e-mail) reseta a senha de outro admin achando que está criando
+    // um novo.
+    const { data: existingUsersPage, error: listError } =
+      await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (listError) throw new Error(listError.message);
+
+    const jaExiste = existingUsersPage.users.some(
+      (u) => (u.email ?? '').toLowerCase() === trimmedEmail
+    );
+    if (jaExiste) {
+      throw new Error(
+        'Este e-mail já possui uma conta cadastrada. Convidar de novo ' +
+          'reenviaria um link que trocaria a senha dessa conta existente ' +
+          '— use outro e-mail.'
+      );
+    }
+
     const { data: invited, error: inviteError } =
       await admin.auth.admin.inviteUserByEmail(trimmedEmail, {
         redirectTo: `${getSiteOrigin()}/admin/definir-senha`,

@@ -76,7 +76,7 @@ export default async function ProdutoPage({ params }: ProdutoPageProps) {
   return (
     <>
       <Header />
-      <main className="pt-16">
+      <main className="pt-[108px]">
         <ProductDetailView perfume={perfume} />
         <RelatedProducts perfumes={relacionados} />
       </main>

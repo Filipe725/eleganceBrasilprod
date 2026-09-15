@@ -5,6 +5,7 @@ import { ChevronDown, X } from 'lucide-react';
 import { formatBRL } from '@/lib/format';
 
 export interface Filters {
+  generos: string[];
   familias: string[];
   tamanhos: string[];
   marcas: string[];
@@ -13,6 +14,7 @@ export interface Filters {
 }
 
 interface Facets {
+  generos: string[];
   familias: string[];
   tamanhos: string[];
   marcas: string[];
@@ -37,6 +39,7 @@ export function FilterDrawer({
   onApply,
   onClose,
 }: FilterDrawerProps) {
+  const [generos, setGeneros] = useState<string[]>(current.generos);
   const [familias, setFamilias] = useState<string[]>(current.familias);
   const [tamanhos, setTamanhos] = useState<string[]>(current.tamanhos);
   const [marcas, setMarcas] = useState<string[]>(current.marcas);
@@ -53,6 +56,7 @@ export function FilterDrawer({
 
   function handleApply() {
     onApply({
+      generos,
       familias,
       tamanhos,
       marcas,
@@ -62,6 +66,7 @@ export function FilterDrawer({
   }
 
   function handleClear() {
+    setGeneros([]);
     setFamilias([]);
     setTamanhos([]);
     setMarcas([]);
@@ -136,6 +141,7 @@ export function FilterDrawer({
         </header>
 
         <div className="flex-1 overflow-y-auto px-5">
+          {checkboxGroup('Gênero', facets.generos, generos, setGeneros)}
           {checkboxGroup(
             'Família Olfativa',
             facets.familias,

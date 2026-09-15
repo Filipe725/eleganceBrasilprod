@@ -27,3 +27,6 @@ yarn-error.log*
 
 # supabase (schema/migrations aplicados direto no projeto Supabase)
 /supabase/
+
+# relatórios exportados (regeneráveis via scripts/export-perfumes.mjs)
+/relatorio-perfumes.csv
