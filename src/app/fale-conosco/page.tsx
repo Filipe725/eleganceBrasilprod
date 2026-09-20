@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { MessageCircle, Mail, MapPin, Clock } from 'lucide-react';
 import { PageShell } from '@/components/site/PageShell';
+import { WhatsAppLink } from '@/components/site/WhatsAppLink';
 import {
   STORE_NAME,
   STORE_EMAIL,
@@ -25,10 +26,9 @@ export default function FaleConoscoPage() {
     >
       <div className="space-y-4">
         {/* CTA principal: WhatsApp */}
-        <a
+        <WhatsAppLink
           href={whatsappLink}
-          target="_blank"
-          rel="noopener noreferrer"
+          source="fale_conosco"
           className="tap-target flex items-center gap-4 rounded-xl bg-[#25D366] p-5 text-white shadow-md transition hover:brightness-105 active:scale-[0.99]"
         >
           <MessageCircle className="h-8 w-8 shrink-0" aria-hidden />
@@ -41,7 +41,7 @@ export default function FaleConoscoPage() {
               {WHATSAPP_NUMBER ? ` • +${WHATSAPP_NUMBER}` : ''}
             </span>
           </span>
-        </a>
+        </WhatsAppLink>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <a

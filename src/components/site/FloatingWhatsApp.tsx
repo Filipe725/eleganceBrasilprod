@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { MessageCircle } from 'lucide-react';
 import { STORE_NAME, WHATSAPP_NUMBER } from '@/lib/constants';
+import { WhatsAppLink } from './WhatsAppLink';
 
 /**
  * Botão flutuante do WhatsApp, fixo no canto inferior direito de toda
@@ -18,14 +19,13 @@ export function FloatingWhatsApp() {
   )}`;
 
   return (
-    <a
+    <WhatsAppLink
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      source="floating_button"
       aria-label="Tirar dúvidas pelo WhatsApp"
       className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl shadow-ink-950/25 transition hover:scale-105 hover:brightness-105 active:scale-95"
     >
       <MessageCircle className="h-7 w-7" aria-hidden />
-    </a>
+    </WhatsAppLink>
   );
 }

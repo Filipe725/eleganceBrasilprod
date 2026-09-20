@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { X, ShoppingBag, MessageCircle, Trash2 } from 'lucide-react';
 import { useCartStore, selectCartTotal } from '@/store/cart-store';
 import { buildWhatsAppOrderLink } from '@/lib/whatsapp';
+import { trackWhatsAppCheckout } from '@/lib/meta-pixel';
 import { formatBRL } from '@/lib/format';
 import { CartItemRow } from './CartItemRow';
 
@@ -15,6 +16,7 @@ export function CartDrawer() {
   // limpa o carrinho (e o localStorage, via persist) e fecha a gaveta.
   // O setTimeout garante que a navegação do link aconteça primeiro.
   function handleCheckout() {
+    trackWhatsAppCheckout(items, total);
     setTimeout(() => {
       clearCart();
       closeCart();

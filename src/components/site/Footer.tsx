@@ -7,6 +7,7 @@ import {
   WHATSAPP_NUMBER,
   INSTITUTIONAL_LINKS,
 } from '@/lib/constants';
+import { WhatsAppLink } from './WhatsAppLink';
 
 /**
  * Rodapé institucional com trust signals, links das páginas estáticas
@@ -71,15 +72,14 @@ export function Footer() {
           <ul className="space-y-3 text-sm">
             {WHATSAPP_NUMBER && (
               <li>
-                <a
+                <WhatsAppLink
                   href={`https://wa.me/${WHATSAPP_NUMBER}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  source="footer"
                   className="flex items-center gap-2.5 transition hover:text-gold-300"
                 >
                   <MessageCircle className="h-4 w-4 shrink-0 text-gold-400" aria-hidden />
                   WhatsApp: +{WHATSAPP_NUMBER}
-                </a>
+                </WhatsAppLink>
               </li>
             )}
             <li>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Search, MessageCircle, X } from 'lucide-react';
 import { STORE_NAME, WHATSAPP_NUMBER } from '@/lib/constants';
 import { CartButton } from '@/components/cart/CartButton';
+import { WhatsAppLink } from './WhatsAppLink';
 import { useSearchStore } from '@/store/search-store';
 
 const NAV_LINKS = [
@@ -94,15 +95,14 @@ export function Header() {
         {/* Atendimento + Carrinho */}
         <div className="flex items-center justify-self-end gap-1">
           {whatsappHref && (
-            <a
+            <WhatsAppLink
               href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              source="header_desktop"
               className="tap-target hidden items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-muted transition hover:text-ink-900 sm:flex"
             >
               <MessageCircle className="h-5 w-5" aria-hidden />
               Atendimento
-            </a>
+            </WhatsAppLink>
           )}
           <CartButton showLabel />
         </div>
@@ -121,14 +121,13 @@ export function Header() {
             </a>
           ))}
           {whatsappHref && (
-            <a
+            <WhatsAppLink
               href={whatsappHref}
-              target="_blank"
-              rel="noopener noreferrer"
+              source="header_nav"
               className="shrink-0 whitespace-nowrap transition hover:text-gold-600"
             >
               Atendimento
-            </a>
+            </WhatsAppLink>
           )}
         </div>
       </nav>
