@@ -4,7 +4,7 @@ const ITEMS = [
   {
     Icon: Percent,
     title: 'Frete Grátis',
-    desc: 'Nas compras acima de R$250,00',
+    desc: 'Escolha seu produto e não pague nada pelo envio.',
   },
   {
     Icon: WalletCards,
