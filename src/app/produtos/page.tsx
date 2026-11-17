@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import type { Perfume } from '@/lib/types';
+import { PERFUME_SELECT } from '@/lib/decants';
 import { STORE_NAME } from '@/lib/constants';
 import { Header } from '@/components/site/Header';
 import { Footer } from '@/components/site/Footer';
@@ -22,7 +23,7 @@ export default async function ProdutosPage() {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('perfumes')
-      .select('*')
+      .select(PERFUME_SELECT)
       .eq('ativo', true)
       .order('created_at', { ascending: false });
 

@@ -9,14 +9,23 @@ import {
   Droplets,
   ShoppingBag,
 } from 'lucide-react';
-import type { Perfume } from '@/lib/types';
+import type { Perfume, PerfumeDecant } from '@/lib/types';
 import { formatBRL } from '@/lib/format';
+import { activeDecants, formatVolume } from '@/lib/decants';
 import { perfumeDiscount, MAX_PARCELAS } from '@/lib/discount';
+import { trackAddToCart } from '@/lib/meta-pixel';
 import { useCartStore } from '@/store/cart-store';
 
 interface ProductDetailViewProps {
   perfume: Perfume;
 }
+
+const optionClass = (selecionado: boolean) =>
+  `rounded-full border px-4 py-2 text-sm font-semibold transition ${
+    selecionado
+      ? 'border-ink-900 bg-ink-900 text-white'
+      : 'border-ink-700/25 bg-white text-ink-800 hover:border-ink-900'
+  }`;
 
 /**
  * Layout de duas colunas (1 no mobile): galeria com miniaturas clicáveis
@@ -28,9 +37,15 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
   const [tamanhoSelecionado, setTamanhoSelecionado] = useState(
     perfume.tamanho[0] ?? null
   );
+  // null = frasco (preço do perfume); preenchido = decant escolhido
+  const [decantSelecionado, setDecantSelecionado] = useState<PerfumeDecant | null>(
+    null
+  );
 
-  const discount = perfumeDiscount(perfume);
-  const parcela = perfume.preco_atual / MAX_PARCELAS;
+  const decants = activeDecants(perfume);
+  const preco = decantSelecionado ? decantSelecionado.preco : perfume.preco_atual;
+  const discount = decantSelecionado ? null : perfumeDiscount(perfume);
+  const parcela = preco / MAX_PARCELAS;
   const fotos = perfume.fotos;
   const temVariasFotos = fotos.length > 1;
 
@@ -150,40 +165,77 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
               {formatBRL(perfume.preco_antigo)}
             </p>
           )}
-          <p className="text-3xl font-bold text-wine">
-            {formatBRL(perfume.preco_atual)}
-          </p>
-          <p className="text-sm text-muted/80">
-            em até {MAX_PARCELAS}x de {formatBRL(parcela)} sem juros
-          </p>
+          <p className="text-3xl font-bold text-wine">{formatBRL(preco)}</p>
+          {decantSelecionado ? (
+            <p className="text-sm text-muted/80">
+              Decant de {formatVolume(decantSelecionado.volume_ml)} — amostra
+              original fracionada do frasco
+            </p>
+          ) : (
+            <p className="text-sm text-muted/80">
+              em até {MAX_PARCELAS}x de {formatBRL(parcela)} sem juros
+            </p>
+          )}
         </div>
 
         {perfume.tamanho.length > 0 && (
           <div className="mt-6">
-            <p className="mb-2 text-sm font-semibold text-ink-800">Tamanho</p>
+            <p className="mb-2 text-sm font-semibold text-ink-800">
+              {decants.length > 0 ? 'Frasco' : 'Tamanho'}
+            </p>
             <div className="flex flex-wrap gap-2">
-              {perfume.tamanho.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTamanhoSelecionado(t)}
-                  aria-pressed={tamanhoSelecionado === t}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    tamanhoSelecionado === t
-                      ? 'border-ink-900 bg-ink-900 text-white'
-                      : 'border-ink-700/25 bg-white text-ink-800 hover:border-ink-900'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+              {perfume.tamanho.map((t) => {
+                const selecionado = !decantSelecionado && tamanhoSelecionado === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setDecantSelecionado(null);
+                      setTamanhoSelecionado(t);
+                    }}
+                    aria-pressed={selecionado}
+                    className={optionClass(selecionado)}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {decants.length > 0 && (
+          <div className="mt-5">
+            <p className="mb-2 text-sm font-semibold text-ink-800">Decant</p>
+            <div className="flex flex-wrap gap-2">
+              {decants.map((decant) => {
+                const selecionado = decantSelecionado?.id === decant.id;
+                return (
+                  <button
+                    key={decant.id}
+                    type="button"
+                    onClick={() => setDecantSelecionado(decant)}
+                    aria-pressed={selecionado}
+                    className={optionClass(selecionado)}
+                  >
+                    {formatVolume(decant.volume_ml)}
+                    <span className={selecionado ? 'text-white/75' : 'text-muted'}>
+                      {' '}· {formatBRL(decant.preco)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         <button
           type="button"
-          onClick={() => addItem(perfume)}
+          onClick={() => {
+            addItem(perfume, tamanhoSelecionado, decantSelecionado);
+            trackAddToCart(perfume, preco);
+          }}
           className="tap-target mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-charcoal px-6 py-4 text-sm font-bold uppercase tracking-[0.1em] text-white transition hover:bg-ink-950 active:scale-95"
         >
           <ShoppingBag className="h-5 w-5" aria-hidden />

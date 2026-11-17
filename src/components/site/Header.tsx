@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Search, MessageCircle, X } from 'lucide-react';
 import { STORE_NAME, WHATSAPP_NUMBER } from '@/lib/constants';
@@ -11,6 +12,7 @@ import { useSearchStore } from '@/store/search-store';
 const NAV_LINKS = [
   { href: '/', label: 'Início' },
   { href: '/produtos', label: 'Produtos' },
+  { href: '/assinatura', label: 'Clube de Decants' },
   { href: '/quem-somos', label: 'Quem Somos' },
   { href: '/fale-conosco', label: 'Fale Conosco' },
 ];
@@ -83,14 +85,14 @@ export function Header() {
         </div>
 
         {/* Marca */}
-        <a href="/" className="justify-self-center text-center leading-tight">
+        <Link href="/" className="justify-self-center text-center leading-tight">
           <span className="block font-display text-xl tracking-wide text-gold-600">
             {STORE_NAME}
           </span>
           <span className="hidden text-[10px] font-medium uppercase tracking-[0.25em] text-muted sm:block">
             Perfumaria &amp; Cosméticos
           </span>
-        </a>
+        </Link>
 
         {/* Atendimento + Carrinho */}
         <div className="flex items-center justify-self-end gap-1">
@@ -112,13 +114,13 @@ export function Header() {
       <nav aria-label="Navegação principal" className="border-t border-gold-400/10">
         <div className="mx-auto flex max-w-6xl items-center gap-5 overflow-x-auto px-5 py-2.5 text-sm font-medium text-ink-800 sm:px-6">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="shrink-0 whitespace-nowrap transition hover:text-gold-600"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
           {whatsappHref && (
             <WhatsAppLink

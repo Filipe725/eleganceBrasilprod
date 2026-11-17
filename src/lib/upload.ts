@@ -49,3 +49,41 @@ export async function uploadImage(file: File, folder = ''): Promise<string> {
 
   return publicUrl;
 }
+
+const PUBLIC_BUCKET_PREFIX = '/storage/v1/object/public/perfumes/';
+
+/**
+ * Extrai o caminho dentro do bucket `perfumes` a partir da URL pública.
+ * Retorna null para URLs de fora do bucket (ex.: `/hero-desktop.jpeg`).
+ */
+function storagePathFromUrl(url: string): string | null {
+  try {
+    const { pathname } = new URL(url);
+    const index = pathname.indexOf(PUBLIC_BUCKET_PREFIX);
+    if (index === -1) return null;
+    return decodeURIComponent(pathname.slice(index + PUBLIC_BUCKET_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Apaga do Storage as imagens que deixaram de ser usadas (registro
+ * excluído ou arte/foto substituída). É "melhor esforço": se falhar, o
+ * registro já foi salvo e o arquivo só fica órfão no bucket, como antes.
+ */
+export async function deleteImages(
+  urls: (string | null | undefined)[]
+): Promise<void> {
+  const paths = urls.flatMap((url) => {
+    const path = url ? storagePathFromUrl(url) : null;
+    return path ? [path] : [];
+  });
+  if (paths.length === 0) return;
+
+  try {
+    await createClient().storage.from('perfumes').remove(paths);
+  } catch {
+    // ignora: ver comentário acima
+  }
+}

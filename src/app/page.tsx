@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { BannerSeccao, HeroConfig, HeroSlide, Perfume } from '@/lib/types';
+import { PERFUME_SELECT } from '@/lib/decants';
 import { getActiveHeroSlides } from '@/lib/hero';
 import { Header } from '@/components/site/Header';
 import { Hero } from '@/components/site/Hero';
@@ -29,7 +30,7 @@ export default async function HomePage() {
       await Promise.all([
         supabase
           .from('perfumes')
-          .select('*')
+          .select(PERFUME_SELECT)
           .eq('ativo', true)
           .order('created_at', { ascending: false }),
         supabase

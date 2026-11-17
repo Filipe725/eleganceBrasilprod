@@ -17,6 +17,57 @@ export interface Perfume {
   ativo: boolean;
   created_at: string;
   updated_at: string;
+  decants?: PerfumeDecant[]; // vem do join `decants:perfume_decants(*)` (ver PERFUME_SELECT)
+}
+
+/** Decant (amostra fracionada) de um perfume, com preço próprio. */
+export interface PerfumeDecant {
+  id: string;
+  perfume_id: string;
+  volume_ml: number; // ex: 2, 5, 10
+  preco: number;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanoAssinatura {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  qtd_decants: number; // decants enviados por mês
+  volume_ml: number; // volume de cada decant
+  preco_mensal: number;
+  ativo: boolean;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type StatusAssinante = 'pendente' | 'ativo' | 'pausado' | 'cancelado';
+export type GeneroPreferido = Genero | 'Sem preferência';
+
+export interface Assinante {
+  id: string;
+  plano_id: string | null;
+  nome: string;
+  email: string;
+  whatsapp: string;
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento: string | null;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  genero_preferido: GeneroPreferido;
+  familias_preferidas: string[];
+  familias_evitar: string[];
+  observacoes: string | null;
+  status: StatusAssinante;
+  aceite_termos_em: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface BannerSeccao {
@@ -55,5 +106,7 @@ export interface HeroConfig {
 
 export interface CartItem {
   perfume: Perfume;
+  tamanho: string | null; // tamanho do frasco escolhido (ex: "100ml"); null se decant ou sem tamanhos
+  decant: PerfumeDecant | null; // preenchido quando o item é um decant (preço vem dele)
   quantidade: number;
 }

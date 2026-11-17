@@ -6,6 +6,8 @@ import { Droplets, ShoppingBag } from 'lucide-react';
 import type { Perfume } from '@/lib/types';
 import { formatBRL } from '@/lib/format';
 import { perfumeDiscount, MAX_PARCELAS } from '@/lib/discount';
+import { menorPrecoDecant } from '@/lib/decants';
+import { trackAddToCart } from '@/lib/meta-pixel';
 import { useCartStore } from '@/store/cart-store';
 
 interface ProductCardProps {
@@ -23,6 +25,11 @@ export function ProductCard({ perfume }: ProductCardProps) {
   const parcela = perfume.preco_atual / MAX_PARCELAS;
 
   const capa = perfume.fotos[0];
+  const decantMinimo = menorPrecoDecant(perfume);
+  // Mais de uma opção (vários tamanhos ou decants): escolhe na página do produto
+  const temVariasOpcoes = perfume.tamanho.length > 1 || decantMinimo !== null;
+  const ctaClass =
+    'tap-target mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-charcoal px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-ink-950 active:scale-95 sm:text-sm';
 
   return (
     <article className="group flex h-full flex-col">
@@ -77,18 +84,38 @@ export function ProductCard({ perfume }: ProductCardProps) {
             <p className="text-[11px] text-muted/80">
               em até {MAX_PARCELAS}x de {formatBRL(parcela)} sem juros
             </p>
+            {decantMinimo !== null && (
+              <p className="mt-1.5 inline-flex rounded-full bg-gold-300/40 px-2.5 py-0.5 text-[11px] font-semibold text-gold-600">
+                Decant a partir de {formatBRL(decantMinimo)}
+              </p>
+            )}
           </div>
         </div>
       </Link>
 
-      <button
-        type="button"
-        onClick={() => addItem(perfume)}
-        className="tap-target mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-charcoal px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-ink-950 active:scale-95 sm:text-sm"
-      >
-        <ShoppingBag className="h-4 w-4" aria-hidden />
-        Comprar
-      </button>
+      {/* Com mais de uma opção, o cliente escolhe na página do produto —
+          adicionar direto daqui mandaria o pedido sem saber qual. */}
+      {temVariasOpcoes ? (
+        <Link
+          href={`/produto/${perfume.id}`}
+          className={ctaClass}
+        >
+          <ShoppingBag className="h-4 w-4" aria-hidden />
+          Comprar
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            addItem(perfume, perfume.tamanho[0] ?? null);
+            trackAddToCart(perfume);
+          }}
+          className={ctaClass}
+        >
+          <ShoppingBag className="h-4 w-4" aria-hidden />
+          Comprar
+        </button>
+      )}
     </article>
   );
 }

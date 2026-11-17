@@ -8,6 +8,7 @@ import {
   INSTITUTIONAL_LINKS,
 } from '@/lib/constants';
 import { WhatsAppLink } from './WhatsAppLink';
+import { CookiePreferencesButton } from './CookieConsent';
 
 /**
  * Rodapé institucional com trust signals, links das páginas estáticas
@@ -61,6 +62,9 @@ export function Footer() {
                 </Link>
               </li>
             ))}
+            <li>
+              <CookiePreferencesButton className="transition hover:text-gold-300" />
+            </li>
           </ul>
         </nav>
 

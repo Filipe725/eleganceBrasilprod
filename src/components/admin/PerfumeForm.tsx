@@ -9,7 +9,7 @@ import {
   type ChangeEvent,
 } from 'react';
 import Image from 'next/image';
-import { Loader2, Save, X, ImagePlus, ChevronDown } from 'lucide-react';
+import { Loader2, Save, X, ImagePlus, ChevronDown, Plus } from 'lucide-react';
 import type { BannerSeccao, Genero, Perfume } from '@/lib/types';
 import { FAMILIAS_OLFATIVAS } from '@/lib/constants';
 import { uploadImage, validateImageFile } from '@/lib/upload';
@@ -35,8 +35,24 @@ interface PerfumeFormProps {
   perfume: Perfume | null; // null = criação; preenchido = edição
   seccoes: BannerSeccao[]; // secções da Home disponíveis para o tag_destaque
   perfumes: Perfume[]; // catálogo atual, usado para aprender famílias olfativas já cadastradas
-  onSave: (data: PerfumeFormData) => Promise<void>;
+  onSave: (data: PerfumeFormData, decants: DecantInput[]) => Promise<void>;
   onCancel: () => void;
+}
+
+/** Decant validado, pronto para salvar (`id` ausente = novo). */
+export interface DecantInput {
+  id?: string;
+  volume_ml: number;
+  preco: number;
+  ativo: boolean;
+}
+
+/** Linha editável de decant no formulário (valores como texto do input). */
+interface DecantRow {
+  id?: string;
+  volume: string;
+  preco: string;
+  ativo: boolean;
 }
 
 interface FotoItem {
@@ -249,8 +265,24 @@ export function PerfumeForm({
   const [fotos, setFotos] = useState<FotoItem[]>(
     (perfume?.fotos ?? []).map((url) => ({ url }))
   );
+  const [decants, setDecants] = useState<DecantRow[]>(
+    [...(perfume?.decants ?? [])]
+      .sort((a, b) => a.volume_ml - b.volume_ml)
+      .map((d) => ({
+        id: d.id,
+        volume: String(d.volume_ml),
+        preco: String(d.preco),
+        ativo: d.ativo,
+      }))
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function updateDecant(index: number, patch: Partial<DecantRow>) {
+    setDecants((prev) =>
+      prev.map((decant, i) => (i === index ? { ...decant, ...patch } : decant))
+    );
+  }
 
   function handleFotosChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -332,6 +364,30 @@ export function PerfumeForm({
       return;
     }
 
+    const decantsFinal: DecantInput[] = [];
+    for (const decant of decants) {
+      const volume = Number(decant.volume.replace(',', '.'));
+      const precoDecant = Number(decant.preco.replace(',', '.'));
+      if (!decant.volume || Number.isNaN(volume) || volume <= 0) {
+        setError('Informe o volume de cada decant em ml, ex.: 5');
+        return;
+      }
+      if (!decant.preco || Number.isNaN(precoDecant) || precoDecant < 0) {
+        setError(`Informe o preço do decant de ${volume} ml, ex.: 49.90`);
+        return;
+      }
+      if (decantsFinal.some((d) => d.volume_ml === volume)) {
+        setError(`Há dois decants de ${volume} ml — cada volume só pode aparecer uma vez.`);
+        return;
+      }
+      decantsFinal.push({
+        id: decant.id,
+        volume_ml: volume,
+        preco: precoDecant,
+        ativo: decant.ativo,
+      });
+    }
+
     const notasFinal = [
       notasTopo.length > 0 ? `Nota de Topo: ${joinComE(notasTopo)}` : null,
       notasCoracao.length > 0 ? `Nota de Coração: ${joinComE(notasCoracao)}` : null,
@@ -360,7 +416,7 @@ export function PerfumeForm({
         tag_destaque: tagDestaque || null,
         genero,
         ativo,
-      });
+      }, decantsFinal);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar.');
       setSaving(false);
@@ -585,6 +641,89 @@ export function PerfumeForm({
             className={inputClass}
             placeholder="Ex.: 50, 100, 200"
           />
+        </div>
+
+        {/* Decants: opções fracionadas com preço próprio */}
+        <div className="sm:col-span-2">
+          <span className="mb-1.5 block text-sm font-medium text-ink-800">
+            Decants (opcional)
+          </span>
+          <p className="mb-3 text-xs text-ink-700/70">
+            Amostras fracionadas vendidas junto com o frasco. Cada volume tem
+            preço próprio; desmarque &ldquo;À venda&rdquo; para esconder sem excluir.
+          </p>
+          {decants.length > 0 && (
+            <ul className="mb-3 space-y-2">
+              {decants.map((decant, index) => (
+                <li
+                  key={decant.id ?? `novo-${index}`}
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-ink-700/15 bg-cream/50 p-2"
+                >
+                  <label className="flex items-center gap-1.5 text-sm text-ink-800">
+                    <span className="sr-only">Volume do decant {index + 1}</span>
+                    <input
+                      inputMode="decimal"
+                      value={decant.volume}
+                      onChange={(event) =>
+                        updateDecant(index, {
+                          volume: sanitizeDecimalInput(event.target.value),
+                        })
+                      }
+                      className="w-20 rounded-lg border border-ink-700/20 bg-white px-3 py-2 text-ink-900 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+                      placeholder="5"
+                    />
+                    ml
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-ink-800">
+                    R$
+                    <span className="sr-only">Preço do decant {index + 1}</span>
+                    <input
+                      inputMode="decimal"
+                      value={decant.preco}
+                      onChange={(event) =>
+                        updateDecant(index, {
+                          preco: sanitizeDecimalInput(event.target.value),
+                        })
+                      }
+                      className="w-28 rounded-lg border border-ink-700/20 bg-white px-3 py-2 text-ink-900 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+                      placeholder="49.90"
+                    />
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-800">
+                    <input
+                      type="checkbox"
+                      checked={decant.ativo}
+                      onChange={(event) =>
+                        updateDecant(index, { ativo: event.target.checked })
+                      }
+                      className="h-5 w-5 rounded accent-gold-600"
+                    />
+                    À venda
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDecants((prev) => prev.filter((_, i) => i !== index))
+                    }
+                    aria-label={`Remover decant ${index + 1}`}
+                    className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-ink-700/60 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              setDecants((prev) => [...prev, { volume: '', preco: '', ativo: true }])
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-gold-600/60 px-3 py-2 text-sm font-semibold text-gold-600 transition hover:bg-gold-300/20"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Adicionar decant
+          </button>
         </div>
 
         <div>

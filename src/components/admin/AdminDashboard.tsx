@@ -7,18 +7,29 @@ import {
   Images,
   ShieldCheck,
   GalleryHorizontal,
+  Package,
   Search,
   X,
 } from 'lucide-react';
-import type { BannerSeccao, HeroConfig, HeroSlide, Perfume } from '@/lib/types';
+import type {
+  Assinante,
+  BannerSeccao,
+  HeroConfig,
+  HeroSlide,
+  Perfume,
+  PlanoAssinatura,
+} from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { deleteImages } from '@/lib/upload';
 import { matchesSearch } from '@/store/search-store';
 import type { AdminUser } from '@/app/admin/actions';
-import { PerfumeForm, type PerfumeFormData } from './PerfumeForm';
+import { PERFUME_SELECT } from '@/lib/decants';
+import { PerfumeForm, type DecantInput, type PerfumeFormData } from './PerfumeForm';
 import { PerfumeList } from './PerfumeList';
 import { BannerManager } from './BannerManager';
 import { HeroManager } from './HeroManager';
 import { AdminUsersManager } from './AdminUsersManager';
+import { AssinaturasManager } from './AssinaturasManager';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface AdminDashboardProps {
@@ -27,10 +38,12 @@ interface AdminDashboardProps {
   initialHeroSlides: HeroSlide[];
   initialHeroConfig: HeroConfig;
   initialAdmins: AdminUser[];
+  initialPlanos: PlanoAssinatura[];
+  initialAssinantes: Assinante[];
   currentUserId: string;
 }
 
-type Tab = 'perfumes' | 'banners' | 'hero' | 'admins';
+type Tab = 'perfumes' | 'banners' | 'hero' | 'assinaturas' | 'admins';
 
 /**
  * Orquestra o painel: aba de perfumes (CRUD completo), aba de
@@ -42,6 +55,8 @@ export function AdminDashboard({
   initialHeroSlides,
   initialHeroConfig,
   initialAdmins,
+  initialPlanos,
+  initialAssinantes,
   currentUserId,
 }: AdminDashboardProps) {
   const [tab, setTab] = useState<Tab>('perfumes');
@@ -49,6 +64,9 @@ export function AdminDashboard({
   const [seccoes, setSeccoes] = useState<BannerSeccao[]>(initialSeccoes);
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(initialHeroSlides);
   const [heroConfig, setHeroConfig] = useState<HeroConfig>(initialHeroConfig);
+  const [planos, setPlanos] = useState<PlanoAssinatura[]>(initialPlanos);
+  const [assinantes, setAssinantes] = useState<Assinante[]>(initialAssinantes);
+  const assinantesPendentes = assinantes.filter((a) => a.status === 'pendente').length;
   const [editing, setEditing] = useState<Perfume | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -67,36 +85,87 @@ export function AdminDashboard({
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  async function handleSave(formData: PerfumeFormData) {
+  /**
+   * Sincroniza os decants do perfume com a lista do formulário, usando o
+   * volume como chave: volumes que continuam mantêm o mesmo id (carrinhos
+   * com esse decant seguem válidos); volumes retirados são excluídos.
+   */
+  async function saveDecants(perfumeId: string, decants: DecantInput[]) {
     const supabase = createClient();
 
-    if (editing) {
-      const { data, error } = await supabase
-        .from('perfumes')
-        .update(formData)
-        .eq('id', editing.id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-
-      setPerfumes((current) =>
-        current.map((perfume) => (perfume.id === editing.id ? data : perfume))
+    let remover = supabase.from('perfume_decants').delete().eq('perfume_id', perfumeId);
+    if (decants.length > 0) {
+      remover = remover.not(
+        'volume_ml',
+        'in',
+        `(${decants.map((d) => d.volume_ml).join(',')})`
       );
-      notify('Perfume atualizado com sucesso!');
-    } else {
-      const { data, error } = await supabase
-        .from('perfumes')
-        .insert(formData)
-        .select()
-        .single();
+    }
+    const { error: deleteError } = await remover;
+    if (deleteError) throw new Error(deleteError.message);
 
-      if (error) throw new Error(error.message);
+    if (decants.length === 0) return;
+    const { error: upsertError } = await supabase.from('perfume_decants').upsert(
+      decants.map((d) => ({
+        perfume_id: perfumeId,
+        volume_ml: d.volume_ml,
+        preco: d.preco,
+        ativo: d.ativo,
+      })),
+      { onConflict: 'perfume_id,volume_ml' }
+    );
+    if (upsertError) throw new Error(upsertError.message);
+  }
 
-      setPerfumes((current) => [data, ...current]);
-      notify('Perfume adicionado com sucesso!');
+  async function handleSave(formData: PerfumeFormData, decants: DecantInput[]) {
+    const supabase = createClient();
+    const anterior = editing;
+
+    const { data: salvo, error } = anterior
+      ? await supabase
+          .from('perfumes')
+          .update(formData)
+          .eq('id', anterior.id)
+          .select()
+          .single()
+      : await supabase.from('perfumes').insert(formData).select().single();
+
+    if (error) throw new Error(error.message);
+
+    // O perfume já foi gravado: uma falha nos decants não pode deixar o
+    // formulário aberto (salvar de novo duplicaria um perfume novo).
+    let decantError: string | null = null;
+    try {
+      await saveDecants(salvo.id, decants);
+    } catch (err) {
+      decantError = err instanceof Error ? err.message : 'erro desconhecido';
     }
 
+    const { data: completo } = await supabase
+      .from('perfumes')
+      .select(PERFUME_SELECT)
+      .eq('id', salvo.id)
+      .single();
+    const perfumeFinal: Perfume = completo ?? salvo;
+
+    if (anterior) {
+      void deleteImages(
+        anterior.fotos.filter((foto) => !perfumeFinal.fotos.includes(foto))
+      );
+      setPerfumes((current) =>
+        current.map((perfume) => (perfume.id === anterior.id ? perfumeFinal : perfume))
+      );
+    } else {
+      setPerfumes((current) => [perfumeFinal, ...current]);
+    }
+
+    notify(
+      decantError
+        ? `Perfume salvo, mas os decants não: ${decantError}`
+        : anterior
+          ? 'Perfume atualizado com sucesso!'
+          : 'Perfume adicionado com sucesso!'
+    );
     setShowForm(false);
     setEditing(null);
   }
@@ -130,6 +199,7 @@ export function AdminDashboard({
       return;
     }
 
+    void deleteImages(perfume.fotos);
     setPerfumes((current) => current.filter((p) => p.id !== perfume.id));
     notify('Perfume excluído.');
   }
@@ -140,7 +210,7 @@ export function AdminDashboard({
       .from('perfumes')
       .update({ ativo: !perfume.ativo })
       .eq('id', perfume.id)
-      .select()
+      .select(PERFUME_SELECT)
       .single();
 
     if (error) {
@@ -163,7 +233,7 @@ export function AdminDashboard({
   return (
     <div className="space-y-6">
       {/* Abas */}
-      <div className="flex gap-2">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
         <button
           type="button"
           onClick={() => setTab('perfumes')}
@@ -187,6 +257,19 @@ export function AdminDashboard({
         >
           <GalleryHorizontal className="h-4 w-4" aria-hidden />
           Hero &amp; Carrossel
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('assinaturas')}
+          className={tabClass(tab === 'assinaturas')}
+        >
+          <Package className="h-4 w-4" aria-hidden />
+          Assinaturas
+          {assinantesPendentes > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wine px-1 text-[11px] font-bold text-white">
+              {assinantesPendentes}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -309,6 +392,16 @@ export function AdminDashboard({
           onChange={setHeroSlides}
           config={heroConfig}
           onConfigChange={setHeroConfig}
+          notify={notify}
+        />
+      )}
+
+      {tab === 'assinaturas' && (
+        <AssinaturasManager
+          planos={planos}
+          onPlanosChange={setPlanos}
+          assinantes={assinantes}
+          onAssinantesChange={setAssinantes}
           notify={notify}
         />
       )}

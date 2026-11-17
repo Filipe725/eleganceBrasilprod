@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { BannerSeccao } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { uploadImage, validateImageFile } from '@/lib/upload';
+import { deleteImages, uploadImage, validateImageFile } from '@/lib/upload';
 import { isSafeLink } from '@/lib/link';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -103,6 +103,7 @@ export function BannerManager({
       return;
     }
 
+    void deleteImages([seccao.imagem_desktop_url, seccao.imagem_mobile_url]);
     onChange(seccoes.filter((s) => s.id !== seccao.id));
     notify('Secção excluída.');
   }
@@ -261,6 +262,10 @@ function BannerCard({ seccao, onUpdated, onDelete, notify }: BannerCardProps) {
         patch.imagem_mobile_url = await uploadImage(mobileFile, 'banners');
       }
       await persist(patch);
+      void deleteImages([
+        desktopFile ? seccao.imagem_desktop_url : null,
+        mobileFile ? seccao.imagem_mobile_url : null,
+      ]);
       setDesktopFile(null);
       setMobileFile(null);
       notify(`Banner de "${seccao.titulo}" salvo!`);

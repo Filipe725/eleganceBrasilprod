@@ -1,8 +1,9 @@
 'use server';
 
-import { headers } from 'next/headers';
+import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getSiteUrl } from '@/lib/site';
 
 export interface AdminUser {
   user_id: string;
@@ -40,12 +41,20 @@ async function requireAdmin() {
   return user;
 }
 
-function getSiteOrigin() {
-  const h = headers();
-  const host = h.get('host') ?? 'localhost:3000';
-  const proto =
-    h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
-  return `${proto}://${host}`;
+const USERS_PER_PAGE = 1000;
+
+/** Lista todas as contas do Auth, percorrendo as páginas da API. */
+async function listAllUsers(admin: ReturnType<typeof createAdminClient>) {
+  const users: User[] = [];
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: USERS_PER_PAGE,
+    });
+    if (error) throw new Error(error.message);
+    users.push(...data.users);
+    if (data.users.length < USERS_PER_PAGE) return users;
+  }
 }
 
 /** Lista os admins atuais (e-mail + data de autorização). */
@@ -62,12 +71,8 @@ export async function getAdminUsers(): Promise<ActionResult<AdminUser[]>> {
     if (error) throw new Error(error.message);
     if (!rows || rows.length === 0) return { ok: true, data: [] };
 
-    const { data: usersPage, error: usersError } = await admin.auth.admin.listUsers({
-      perPage: 200,
-    });
-    if (usersError) throw new Error(usersError.message);
-
-    const emailById = new Map(usersPage.users.map((u) => [u.id, u.email ?? '—']));
+    const users = await listAllUsers(admin);
+    const emailById = new Map(users.map((u) => [u.id, u.email ?? '—']));
 
     const data = rows.map((row) => ({
       user_id: row.user_id,
@@ -99,11 +104,8 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
     // essa checagem, um erro de digitação (ou reenvio para o mesmo
     // e-mail) reseta a senha de outro admin achando que está criando
     // um novo.
-    const { data: existingUsersPage, error: listError } =
-      await admin.auth.admin.listUsers({ perPage: 1000 });
-    if (listError) throw new Error(listError.message);
-
-    const jaExiste = existingUsersPage.users.some(
+    const existingUsers = await listAllUsers(admin);
+    const jaExiste = existingUsers.some(
       (u) => (u.email ?? '').toLowerCase() === trimmedEmail
     );
     if (jaExiste) {
@@ -116,7 +118,7 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
 
     const { data: invited, error: inviteError } =
       await admin.auth.admin.inviteUserByEmail(trimmedEmail, {
-        redirectTo: `${getSiteOrigin()}/admin/definir-senha`,
+        redirectTo: `${getSiteUrl()}/admin/definir-senha`,
       });
     if (inviteError) throw new Error(inviteError.message);
 

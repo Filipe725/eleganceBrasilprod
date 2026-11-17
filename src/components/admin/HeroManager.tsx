@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import type { HeroConfig, HeroSlide } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { uploadImage, validateImageFile } from '@/lib/upload';
+import { deleteImages, uploadImage, validateImageFile } from '@/lib/upload';
 import { isSafeLink } from '@/lib/link';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -116,6 +116,7 @@ export function HeroManager({
       return;
     }
 
+    void deleteImages([slide.imagem_desktop_url, slide.imagem_mobile_url]);
     onChange(slides.filter((s) => s.id !== slide.id));
     notify('Slide excluído.');
   }
@@ -448,6 +449,10 @@ function HeroSlideCard({
         patch.imagem_mobile_url = await uploadImage(mobileFile, 'hero');
       }
       await persist(patch);
+      void deleteImages([
+        desktopFile ? slide.imagem_desktop_url : null,
+        mobileFile ? slide.imagem_mobile_url : null,
+      ]);
       setDesktopFile(null);
       setMobileFile(null);
       notify(`Slide "${patch.titulo}" salvo!`);

@@ -4,7 +4,8 @@ import Image from 'next/image';
 import { Minus, Plus, Trash2, Droplets } from 'lucide-react';
 import type { CartItem } from '@/lib/types';
 import { formatBRL } from '@/lib/format';
-import { useCartStore } from '@/store/cart-store';
+import { cartItemOption, cartItemPrice } from '@/lib/decants';
+import { cartItemKey, useCartStore } from '@/store/cart-store';
 
 interface CartItemRowProps {
   item: CartItem;
@@ -13,6 +14,8 @@ interface CartItemRowProps {
 export function CartItemRow({ item }: CartItemRowProps) {
   const { setQuantity, removeItem } = useCartStore();
   const { perfume, quantidade } = item;
+  const key = cartItemKey(item);
+  const opcao = cartItemOption(item);
 
   return (
     <li className="flex gap-3 py-4">
@@ -43,12 +46,12 @@ export function CartItemRow({ item }: CartItemRowProps) {
             </h3>
             <p className="text-xs text-ink-700/70">
               {perfume.familia_olfativa.join(', ')}
-              {perfume.tamanho?.length > 0 && ` • ${perfume.tamanho.join(', ')}`}
+              {opcao && ` • ${opcao}`}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => removeItem(perfume.id)}
+            onClick={() => removeItem(key)}
             aria-label={`Remover ${perfume.nome}`}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-700/60 transition hover:bg-red-50 hover:text-red-600"
           >
@@ -60,7 +63,7 @@ export function CartItemRow({ item }: CartItemRowProps) {
           <div className="flex items-center rounded-full border border-ink-700/20">
             <button
               type="button"
-              onClick={() => setQuantity(perfume.id, quantidade - 1)}
+              onClick={() => setQuantity(key, quantidade - 1)}
               aria-label="Diminuir quantidade"
               className="flex h-10 w-10 items-center justify-center rounded-l-full transition hover:bg-ink-900/5"
             >
@@ -74,7 +77,7 @@ export function CartItemRow({ item }: CartItemRowProps) {
             </span>
             <button
               type="button"
-              onClick={() => setQuantity(perfume.id, quantidade + 1)}
+              onClick={() => setQuantity(key, quantidade + 1)}
               aria-label="Aumentar quantidade"
               className="flex h-10 w-10 items-center justify-center rounded-r-full transition hover:bg-ink-900/5"
             >
@@ -82,7 +85,7 @@ export function CartItemRow({ item }: CartItemRowProps) {
             </button>
           </div>
           <span className="text-sm font-bold text-wine">
-            {formatBRL(perfume.preco_atual * quantidade)}
+            {formatBRL(cartItemPrice(item) * quantidade)}
           </span>
         </div>
       </div>

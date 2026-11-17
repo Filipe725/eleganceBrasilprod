@@ -1,16 +1,81 @@
 'use client';
 
-import { useEffect } from 'react';
-import { X, ShoppingBag, MessageCircle, Trash2 } from 'lucide-react';
-import { useCartStore, selectCartTotal } from '@/store/cart-store';
+import { useEffect, useState } from 'react';
+import { X, ShoppingBag, MessageCircle, Trash2, Info } from 'lucide-react';
+import { useCartStore, selectCartTotal, cartItemKey } from '@/store/cart-store';
+import { createClient } from '@/lib/supabase/client';
+import type { Perfume } from '@/lib/types';
+import { PERFUME_SELECT, cartItemPrice } from '@/lib/decants';
 import { buildWhatsAppOrderLink } from '@/lib/whatsapp';
 import { trackWhatsAppCheckout } from '@/lib/meta-pixel';
 import { formatBRL } from '@/lib/format';
 import { CartItemRow } from './CartItemRow';
 
 export function CartDrawer() {
-  const { items, isOpen, closeCart, clearCart } = useCartStore();
+  const { items, isOpen, closeCart, clearCart, syncPerfumes } = useCartStore();
   const total = useCartStore(selectCartTotal);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  // O carrinho guarda uma cópia do perfume no localStorage: ao abrir a
+  // gaveta, busca os dados atuais no banco para o pedido nunca sair com
+  // preço antigo nem com produto que foi desativado/excluído no admin.
+  useEffect(() => {
+    if (!isOpen) {
+      setAviso(null);
+      return;
+    }
+    const salvos = useCartStore.getState().items;
+    if (salvos.length === 0) return;
+
+    const ids = Array.from(new Set(salvos.map((item) => item.perfume.id)));
+    let cancelado = false;
+
+    (async () => {
+      try {
+        const { data, error } = await createClient()
+          .from('perfumes')
+          .select(PERFUME_SELECT)
+          .in('id', ids)
+          .eq('ativo', true);
+        if (cancelado || error || !data) return;
+
+        const fresh = data as Perfume[];
+        const consultados = useCartStore
+          .getState()
+          .items.filter((item) => ids.includes(item.perfume.id));
+        const precoAntes = new Map(
+          consultados.map((item) => [cartItemKey(item), cartItemPrice(item)])
+        );
+
+        syncPerfumes(ids, fresh);
+
+        const depois = useCartStore
+          .getState()
+          .items.filter((item) => precoAntes.has(cartItemKey(item)));
+        const removidos = consultados.length - depois.length;
+        const precoMudou = depois.some(
+          (item) => precoAntes.get(cartItemKey(item)) !== cartItemPrice(item)
+        );
+
+        const partes: string[] = [];
+        if (removidos > 0) {
+          partes.push(
+            removidos === 1
+              ? '1 item indisponível foi removido'
+              : `${removidos} itens indisponíveis foram removidos`
+          );
+        }
+        if (precoMudou) partes.push('os preços foram atualizados');
+        if (partes.length > 0) setAviso(`Carrinho atualizado: ${partes.join(' e ')}.`);
+      } catch {
+        // Falha de rede: mantém o carrinho como está
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [isOpen, syncPerfumes]);
 
   // Após o redirecionamento para o WhatsApp, o pedido foi enviado:
   // limpa o carrinho (e o localStorage, via persist) e fecha a gaveta.
@@ -70,6 +135,16 @@ export function CartDrawer() {
           </button>
         </header>
 
+        {aviso && (
+          <p
+            role="status"
+            className="flex items-start gap-2 border-b border-gold-400/25 bg-gold-300/30 px-4 py-3 text-xs text-ink-900 sm:px-6"
+          >
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" aria-hidden />
+            {aviso}
+          </p>
+        )}
+
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-ink-700">
             <ShoppingBag className="h-12 w-12 text-gold-500/60" aria-hidden />
@@ -86,7 +161,7 @@ export function CartDrawer() {
           <>
             <ul className="flex-1 divide-y divide-ink-700/10 overflow-y-auto px-4 sm:px-6">
               {items.map((item) => (
-                <CartItemRow key={item.perfume.id} item={item} />
+                <CartItemRow key={cartItemKey(item)} item={item} />
               ))}
             </ul>
 

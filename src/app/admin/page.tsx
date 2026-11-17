@@ -1,7 +1,15 @@
 import { redirect } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
-import type { BannerSeccao, HeroConfig, HeroSlide, Perfume } from '@/lib/types';
+import type {
+  Assinante,
+  BannerSeccao,
+  HeroConfig,
+  HeroSlide,
+  Perfume,
+  PlanoAssinatura,
+} from '@/lib/types';
+import { PERFUME_SELECT } from '@/lib/decants';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { getAdminUsers, type AdminUser } from './actions';
@@ -25,6 +33,8 @@ export default async function AdminPage() {
   let seccoes: BannerSeccao[] = [];
   let heroSlides: HeroSlide[] = [];
   let heroConfig: HeroConfig = DEFAULT_HERO_CONFIG;
+  let planos: PlanoAssinatura[] = [];
+  let assinantes: Assinante[] = [];
   let configError = false;
 
   try {
@@ -41,11 +51,17 @@ export default async function AdminPage() {
     }
 
     if (user && isAdmin) {
-      const [perfumesRes, seccoesRes, heroSlidesRes, heroConfigRes] =
-        await Promise.all([
+      const [
+        perfumesRes,
+        seccoesRes,
+        heroSlidesRes,
+        heroConfigRes,
+        planosRes,
+        assinantesRes,
+      ] = await Promise.all([
           supabase
             .from('perfumes')
-            .select('*')
+            .select(PERFUME_SELECT)
             .order('created_at', { ascending: false }),
           supabase
             .from('banners_seccoes')
@@ -56,11 +72,21 @@ export default async function AdminPage() {
             .select('*')
             .order('ordem', { ascending: true }),
           supabase.from('hero_config').select('*').eq('id', 1).maybeSingle(),
+          supabase
+            .from('planos_assinatura')
+            .select('*')
+            .order('ordem', { ascending: true }),
+          supabase
+            .from('assinantes')
+            .select('*')
+            .order('created_at', { ascending: false }),
         ]);
       perfumes = perfumesRes.data ?? [];
       seccoes = seccoesRes.data ?? [];
       heroSlides = heroSlidesRes.data ?? [];
       heroConfig = heroConfigRes.data ?? DEFAULT_HERO_CONFIG;
+      planos = planosRes.data ?? [];
+      assinantes = assinantesRes.data ?? [];
     }
   } catch {
     configError = true;
@@ -91,6 +117,8 @@ export default async function AdminPage() {
           initialHeroSlides={heroSlides}
           initialHeroConfig={heroConfig}
           initialAdmins={admins}
+          initialPlanos={planos}
+          initialAssinantes={assinantes}
           currentUserId={user.id}
         />
       </main>

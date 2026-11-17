@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpDown,
@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import type { Perfume } from '@/lib/types';
+import { PERFUME_SELECT } from '@/lib/decants';
 import { createClient } from '@/lib/supabase/client';
 import { ProductCard } from '@/components/site/ProductCard';
 import { FilterDrawer, type Filters } from './FilterDrawer';
@@ -41,6 +42,9 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Só a consulta mais recente pode atualizar a lista: uma resposta
+  // atrasada de um filtro anterior não sobrescreve a atual.
+  const ultimaConsulta = useRef(0);
 
   // Opções dos filtros derivadas do catálogo inicial completo
   const facets = useMemo(() => {
@@ -75,10 +79,11 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
 
   /** Refaz a busca no Supabase encadeando os filtros selecionados. */
   async function fetchPerfumes(nextFilters: Filters, nextSort: SortKey) {
+    const consulta = ++ultimaConsulta.current;
     setLoading(true);
     try {
       const supabase = createClient();
-      let query = supabase.from('perfumes').select('*').eq('ativo', true);
+      let query = supabase.from('perfumes').select(PERFUME_SELECT).eq('ativo', true);
 
       if (nextFilters.generos.length > 0) {
         query = query.in('genero', nextFilters.generos);
@@ -110,11 +115,12 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
       }
 
       const { data, error } = await query;
+      if (consulta !== ultimaConsulta.current) return;
       if (!error && data) setPerfumes(data);
     } catch {
       // Falha de rede: mantém a lista atual
     } finally {
-      setLoading(false);
+      if (consulta === ultimaConsulta.current) setLoading(false);
     }
   }
 
