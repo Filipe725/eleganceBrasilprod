@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
-import Image from 'next/image';
+import { getImageProps } from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { HeroConfig, HeroSlide } from '@/lib/types';
 import { isSafeLink } from '@/lib/link';
@@ -132,6 +132,45 @@ export function Hero({ slides, config }: HeroProps) {
   );
 }
 
+/**
+ * Arte do slide com art direction via <picture>: o navegador baixa só a
+ * arte do breakpoint atual — larga (~1920x600) a partir de `sm`, vertical
+ * (~800x1000) abaixo. Com duas <Image priority> escondidas por CSS, o
+ * celular baixava também a arte de desktop (e vice-versa).
+ */
+function HeroPicture({
+  desktopSrc,
+  mobileSrc,
+  alt,
+  priority,
+}: {
+  desktopSrc: string;
+  mobileSrc: string;
+  alt: string;
+  priority: boolean;
+}) {
+  // getImageProps não aceita `priority`: o equivalente é eager + fetchPriority
+  const common = {
+    alt,
+    fill: true,
+    sizes: '100vw',
+    loading: priority ? ('eager' as const) : ('lazy' as const),
+    ...(priority ? { fetchPriority: 'high' as const } : {}),
+  };
+  const {
+    props: { srcSet: desktopSrcSet },
+  } = getImageProps({ ...common, src: desktopSrc });
+  const { props: mobileProps } = getImageProps({ ...common, src: mobileSrc });
+
+  return (
+    <picture>
+      <source media="(min-width: 640px)" srcSet={desktopSrcSet} sizes="100vw" />
+      {/* eslint-disable-next-line @next/next/no-img-element -- props vêm do getImageProps */}
+      <img {...mobileProps} alt={alt} className="object-cover" />
+    </picture>
+  );
+}
+
 function HeroSlideView({
   slide,
   active,
@@ -156,30 +195,12 @@ function HeroSlideView({
       aria-hidden={!active}
     >
       {desktopSrc && (
-        <>
-          {/* Desktop: arte larga (~1920x600) */}
-          <div className="absolute inset-0 hidden sm:block">
-            <Image
-              src={desktopSrc}
-              alt={altText}
-              fill
-              priority={priority}
-              sizes="100vw"
-              className="object-cover"
-            />
-          </div>
-          {/* Mobile: arte vertical (~800x1000) */}
-          <div className="absolute inset-0 sm:hidden">
-            <Image
-              src={mobileSrc ?? desktopSrc}
-              alt={altText}
-              fill
-              priority={priority}
-              sizes="100vw"
-              className="object-cover"
-            />
-          </div>
-        </>
+        <HeroPicture
+          desktopSrc={desktopSrc}
+          mobileSrc={mobileSrc ?? desktopSrc}
+          alt={altText}
+          priority={priority}
+        />
       )}
 
       {/* Overlay escuro à esquerda/base: só entra quando há texto do CMS

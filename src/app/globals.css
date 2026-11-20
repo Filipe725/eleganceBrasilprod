@@ -27,4 +27,37 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /*
+   * Card de grid longo: o navegador pula layout/pintura dos cards fora da
+   * tela (content-visibility). Isso também recorta o que vaza da caixa,
+   * então a margem negativa + padding dá folga para o hover (sobe 8px) e
+   * a sombra lateral da foto sem mudar o layout. O wrapper ignora cliques
+   * para a folga não cobrir o card vizinho.
+   */
+  /* Altura estimada ≈ card real (medido: ~390px em 2 colunas, ~475px em
+     4); o `auto` passa a usar a altura real depois da 1ª renderização. */
+  .cv-card {
+    content-visibility: auto;
+    contain-intrinsic-height: auto 390px;
+    margin: -0.75rem -1.25rem 0;
+    padding: 0.75rem 1.25rem 0;
+    pointer-events: none;
+  }
+
+  @media (min-width: 768px) {
+    .cv-card {
+      contain-intrinsic-height: auto 450px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .cv-card {
+      contain-intrinsic-height: auto 475px;
+    }
+  }
+
+  .cv-card > * {
+    pointer-events: auto;
+  }
 }

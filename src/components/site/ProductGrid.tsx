@@ -30,7 +30,9 @@ export function ProductGrid({ perfumes, layout = 'grid' }: ProductGridProps) {
   return (
     <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 md:grid-cols-3 lg:grid-cols-4">
       {perfumes.map((perfume) => (
-        <ProductCard key={perfume.id} perfume={perfume} />
+        <div key={perfume.id} className="cv-card">
+          <ProductCard perfume={perfume} />
+        </div>
       ))}
     </div>
   );

@@ -31,7 +31,7 @@ interface FilterDrawerProps {
 /**
  * Side drawer de filtros avançados com accordions: família olfativa,
  * tamanho e marca (checkboxes) + faixa de preço (slider min/máx).
- * "Aplicar" dispara a query encadeada no Supabase.
+ * "Aplicar" repassa os filtros ao ProductsExplorer, que filtra no cliente.
  */
 export function FilterDrawer({
   facets,

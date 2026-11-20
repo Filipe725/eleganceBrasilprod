@@ -1,5 +1,6 @@
 'use client';
 
+import { useDeferredValue } from 'react';
 import { SearchX } from 'lucide-react';
 import type { BannerSeccao, Perfume } from '@/lib/types';
 import { useSearchStore, matchesSearch } from '@/store/search-store';
@@ -20,7 +21,9 @@ interface HomeContentProps {
  * e tamanho).
  */
 export function HomeContent({ perfumes, seccoes }: HomeContentProps) {
-  const query = useSearchStore((state) => state.query);
+  // Valor adiado: o input do header responde na hora e o filtro + grid
+  // (centenas de cards) re-renderizam em segundo plano, sem travar a digitação.
+  const query = useDeferredValue(useSearchStore((state) => state.query));
   const searching = query.trim().length > 0;
 
   if (searching) {
@@ -47,7 +50,9 @@ export function HomeContent({ perfumes, seccoes }: HomeContentProps) {
         ) : (
           <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 md:grid-cols-3 lg:grid-cols-4">
             {resultados.map((perfume) => (
-              <ProductCard key={perfume.id} perfume={perfume} />
+              <div key={perfume.id} className="cv-card">
+                <ProductCard perfume={perfume} />
+              </div>
             ))}
           </div>
         )}

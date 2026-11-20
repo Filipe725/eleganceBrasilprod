@@ -1,17 +1,14 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpDown,
   ChevronRight,
-  Loader2,
   PackageSearch,
   SlidersHorizontal,
 } from 'lucide-react';
 import type { Perfume } from '@/lib/types';
-import { PERFUME_SELECT } from '@/lib/decants';
-import { createClient } from '@/lib/supabase/client';
 import { ProductCard } from '@/components/site/ProductCard';
 import { FilterDrawer, type Filters } from './FilterDrawer';
 import { SortSheet, SORT_OPTIONS, type SortKey } from './SortSheet';
@@ -29,22 +26,46 @@ export const EMPTY_FILTERS: Filters = {
   precoMax: null,
 };
 
+const overlaps = (values: string[], selected: string[]) =>
+  values.some((value) => selected.includes(value));
+
+/**
+ * Mesma semântica da antiga query no Supabase: gênero/marca em `.in`,
+ * família/tamanho (text[]) com qualquer interseção, faixa de preço com
+ * limites inclusivos. A lista de entrada já vem do servidor ordenada por
+ * lançamento (created_at desc), e o sort é estável — empates de preço
+ * mantêm essa ordem.
+ */
+function filterAndSort(all: Perfume[], f: Filters, sort: SortKey): Perfume[] {
+  const filtrados = all.filter(
+    (p) =>
+      (f.generos.length === 0 || f.generos.includes(p.genero)) &&
+      (f.marcas.length === 0 || f.marcas.includes(p.marca)) &&
+      (f.familias.length === 0 || overlaps(p.familia_olfativa, f.familias)) &&
+      (f.tamanhos.length === 0 || overlaps(p.tamanho, f.tamanhos)) &&
+      (f.precoMin === null || p.preco_atual >= f.precoMin) &&
+      (f.precoMax === null || p.preco_atual <= f.precoMax)
+  );
+
+  if (sort === 'menor-preco') {
+    return filtrados.sort((a, b) => a.preco_atual - b.preco_atual);
+  }
+  if (sort === 'maior-preco') {
+    return filtrados.sort((a, b) => b.preco_atual - a.preco_atual);
+  }
+  return filtrados;
+}
+
 /**
  * Catálogo completo (/produtos): breadcrumb, barra sticky com
  * "Ordenar" e "Filtrar", e grid 2 col. mobile / 4 col. desktop.
- * Cada mudança de filtro/ordenação refaz a query no Supabase,
- * encadeando .in / .overlaps / .gte / .lte dinamicamente.
+ * Filtros e ordenação rodam no cliente sobre o catálogo vindo do servidor.
  */
 export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
-  const [perfumes, setPerfumes] = useState<Perfume[]>(initialPerfumes);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortKey>('lancamentos');
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
-  const [loading, setLoading] = useState(false);
-  // Só a consulta mais recente pode atualizar a lista: uma resposta
-  // atrasada de um filtro anterior não sobrescreve a atual.
-  const ultimaConsulta = useRef(0);
 
   // Opções dos filtros derivadas do catálogo inicial completo
   const facets = useMemo(() => {
@@ -77,63 +98,21 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
     filters.marcas.length +
     (filters.precoMin !== null || filters.precoMax !== null ? 1 : 0);
 
-  /** Refaz a busca no Supabase encadeando os filtros selecionados. */
-  async function fetchPerfumes(nextFilters: Filters, nextSort: SortKey) {
-    const consulta = ++ultimaConsulta.current;
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      let query = supabase.from('perfumes').select(PERFUME_SELECT).eq('ativo', true);
-
-      if (nextFilters.generos.length > 0) {
-        query = query.in('genero', nextFilters.generos);
-      }
-      if (nextFilters.familias.length > 0) {
-        // coluna text[]: qualquer interseção com as famílias marcadas
-        query = query.overlaps('familia_olfativa', nextFilters.familias);
-      }
-      if (nextFilters.marcas.length > 0) {
-        query = query.in('marca', nextFilters.marcas);
-      }
-      if (nextFilters.tamanhos.length > 0) {
-        // coluna text[]: qualquer interseção com os tamanhos marcados
-        query = query.overlaps('tamanho', nextFilters.tamanhos);
-      }
-      if (nextFilters.precoMin !== null) {
-        query = query.gte('preco_atual', nextFilters.precoMin);
-      }
-      if (nextFilters.precoMax !== null) {
-        query = query.lte('preco_atual', nextFilters.precoMax);
-      }
-
-      if (nextSort === 'menor-preco') {
-        query = query.order('preco_atual', { ascending: true });
-      } else if (nextSort === 'maior-preco') {
-        query = query.order('preco_atual', { ascending: false });
-      } else {
-        query = query.order('created_at', { ascending: false });
-      }
-
-      const { data, error } = await query;
-      if (consulta !== ultimaConsulta.current) return;
-      if (!error && data) setPerfumes(data);
-    } catch {
-      // Falha de rede: mantém a lista atual
-    } finally {
-      if (consulta === ultimaConsulta.current) setLoading(false);
-    }
-  }
+  // O servidor já entrega o catálogo ativo completo: filtrar e ordenar
+  // aqui é instantâneo e não gasta uma ida ao Supabase por clique.
+  const perfumes = useMemo(
+    () => filterAndSort(initialPerfumes, filters, sort),
+    [initialPerfumes, filters, sort]
+  );
 
   function applyFilters(next: Filters) {
     setFilters(next);
     setShowFilter(false);
-    void fetchPerfumes(next, sort);
   }
 
   function applySort(next: SortKey) {
     setSort(next);
     setShowSort(false);
-    void fetchPerfumes(filters, next);
   }
 
   return (
@@ -186,17 +165,11 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
               </span>
             )}
           </button>
-          {loading && (
-            <Loader2
-              className="h-5 w-5 animate-spin text-gold-600"
-              aria-label="Carregando"
-            />
-          )}
         </div>
       </div>
 
       {/* Grid: 2 colunas mobile, 4 desktop */}
-      {perfumes.length === 0 && !loading ? (
+      {perfumes.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-gold-400/40 py-20 text-center text-muted">
           <PackageSearch className="h-10 w-10 text-gold-600" aria-hidden />
           <p className="text-sm">
@@ -211,13 +184,11 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
           </button>
         </div>
       ) : (
-        <div
-          className={`grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 lg:grid-cols-4 ${
-            loading ? 'opacity-60' : ''
-          }`}
-        >
+        <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:gap-x-6 lg:grid-cols-4">
           {perfumes.map((perfume) => (
-            <ProductCard key={perfume.id} perfume={perfume} />
+            <div key={perfume.id} className="cv-card">
+              <ProductCard perfume={perfume} />
+            </div>
           ))}
         </div>
       )}
