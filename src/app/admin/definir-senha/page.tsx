@@ -145,12 +145,18 @@ export default function DefinirSenhaPage() {
     setSaving(true);
     const supabase = createClient();
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setSaving(false);
 
     if (updateError) {
+      setSaving(false);
       setError(updateError.message);
       return;
     }
+
+    // Senha trocada: derruba as sessões de outros aparelhos/navegadores
+    // (se alguém tinha uma sessão roubada, ela morre aqui). Falha nessa
+    // etapa não desfaz a troca — por isso não bloqueia o fluxo.
+    await supabase.auth.signOut({ scope: 'others' }).catch(() => undefined);
+    setSaving(false);
 
     setDone(true);
     setTimeout(() => {

@@ -1,5 +1,6 @@
 'use server';
 
+import { after } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -217,9 +218,25 @@ async function sendRecoveryEmail(email: string) {
 }
 
 /**
+ * Procura o e-mail só entre os membros da equipe (tabela `admins`, poucas
+ * linhas) — nunca lista todas as contas do Auth numa rota pública.
+ */
+async function isTeamEmail(email: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data: rows, error } = await admin.from('admins').select('user_id');
+  if (error) throw new Error(error.message);
+
+  const users = await Promise.all(
+    (rows ?? []).map((row) => admin.auth.admin.getUserById(row.user_id))
+  );
+  return users.some(({ data }) => (data.user?.email ?? '').toLowerCase() === email);
+}
+
+/**
  * "Esqueci minha senha" da tela de login (pública, sem sessão). Só envia
- * o e-mail se o endereço for de alguém da equipe, e SEMPRE responde do
- * mesmo jeito — a tela nunca revela se um e-mail está ou não cadastrado.
+ * o e-mail se o endereço for de alguém da equipe e SEMPRE responde igual.
+ * A busca e o envio rodam em `after()`, depois da resposta: o tempo de
+ * resposta também não revela se o e-mail é da equipe.
  */
 export async function requestPasswordReset(email: string): Promise<ActionResult<null>> {
   const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -227,22 +244,15 @@ export async function requestPasswordReset(email: string): Promise<ActionResult<
     return { ok: false, error: 'Informe um e-mail válido.' };
   }
 
-  try {
-    const admin = createAdminClient();
-    const users = await listAllUsers(admin);
-    const user = users.find((u) => (u.email ?? '').toLowerCase() === trimmedEmail);
-    if (user) {
-      const { data: membro } = await admin
-        .from('admins')
-        .select('user_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (membro) await sendRecoveryEmail(trimmedEmail);
+  after(async () => {
+    try {
+      if (await isTeamEmail(trimmedEmail)) await sendRecoveryEmail(trimmedEmail);
+    } catch (err) {
+      // Só no log do servidor; quem pediu sempre vê a mesma resposta.
+      console.error('requestPasswordReset:', errorMessage(err, 'erro desconhecido'));
     }
-  } catch (err) {
-    // Loga no servidor, mas não devolve detalhes: a resposta é a mesma.
-    console.error('requestPasswordReset:', errorMessage(err, 'erro desconhecido'));
-  }
+  });
+
   return { ok: true, data: null };
 }
 
