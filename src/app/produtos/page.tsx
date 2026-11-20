@@ -20,7 +20,7 @@ export default async function ProdutosPage() {
   let perfumes: Perfume[] = [];
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('perfumes')
       .select(PERFUME_SELECT)

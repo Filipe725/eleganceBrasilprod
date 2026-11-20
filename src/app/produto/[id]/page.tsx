@@ -15,14 +15,15 @@ import { RelatedProducts } from '@/components/produto/RelatedProducts';
 export const dynamic = 'force-dynamic';
 
 interface ProdutoPageProps {
-  params: { id: string };
+  // Next 15: params chega como Promise
+  params: Promise<{ id: string }>;
 }
 
 // cache(): generateMetadata e a página pedem o mesmo perfume na mesma
 // requisição — assim o Supabase é consultado uma vez só.
 const getPerfume = cache(async (id: string): Promise<Perfume | null> => {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('perfumes')
       .select(PERFUME_SELECT)
@@ -44,7 +45,7 @@ async function getRelacionados(perfume: Perfume): Promise<Perfume[]> {
   if (perfume.familia_olfativa.length === 0) return [];
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('perfumes')
       .select(PERFUME_SELECT)
@@ -63,7 +64,8 @@ async function getRelacionados(perfume: Perfume): Promise<Perfume[]> {
 export async function generateMetadata({
   params,
 }: ProdutoPageProps): Promise<Metadata> {
-  const perfume = await getPerfume(params.id);
+  const { id } = await params;
+  const perfume = await getPerfume(id);
   if (!perfume) return { title: `Produto — ${STORE_NAME}` };
 
   const title = `${perfume.nome} — ${STORE_NAME}`;
@@ -83,7 +85,7 @@ export async function generateMetadata({
 }
 
 /** Dados estruturados schema.org/Product (preço e foto nos resultados do Google). */
-function productJsonLd(perfume: Perfume) {
+function productJsonLd(perfume: Perfume, siteUrl: string) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -93,7 +95,7 @@ function productJsonLd(perfume: Perfume) {
     image: perfume.fotos,
     offers: {
       '@type': 'Offer',
-      url: `${getSiteUrl()}/produto/${perfume.id}`,
+      url: `${siteUrl}/produto/${perfume.id}`,
       price: perfume.preco_atual.toFixed(2),
       priceCurrency: 'BRL',
       availability: 'https://schema.org/InStock',
@@ -102,10 +104,14 @@ function productJsonLd(perfume: Perfume) {
 }
 
 export default async function ProdutoPage({ params }: ProdutoPageProps) {
-  const perfume = await getPerfume(params.id);
+  const { id } = await params;
+  const perfume = await getPerfume(id);
   if (!perfume) notFound();
 
-  const relacionados = await getRelacionados(perfume);
+  const [relacionados, siteUrl] = await Promise.all([
+    getRelacionados(perfume),
+    getSiteUrl(),
+  ]);
 
   return (
     <>
@@ -113,7 +119,7 @@ export default async function ProdutoPage({ params }: ProdutoPageProps) {
         type="application/ld+json"
         // `<` escapado: texto vindo do admin nunca fecha a tag <script>
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productJsonLd(perfume)).replace(/</g, '\\u003c'),
+          __html: JSON.stringify(productJsonLd(perfume, siteUrl)).replace(/</g, '\\u003c'),
         }}
       />
       <Header />

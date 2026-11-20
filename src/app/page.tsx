@@ -25,7 +25,7 @@ export default async function HomePage() {
   let heroConfig: HeroConfig = DEFAULT_HERO_CONFIG;
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const [perfumesRes, seccoesRes, heroSlidesRes, heroConfigRes] =
       await Promise.all([
         supabase

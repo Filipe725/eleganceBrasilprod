@@ -29,7 +29,7 @@ function errorMessage(err: unknown, fallback: string): string {
 
 /** Garante que quem chamou a action está logado e é admin; lança erro caso contrário. */
 async function requireAdmin() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -118,7 +118,7 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
 
     const { data: invited, error: inviteError } =
       await admin.auth.admin.inviteUserByEmail(trimmedEmail, {
-        redirectTo: `${getSiteUrl()}/admin/definir-senha`,
+        redirectTo: `${await getSiteUrl()}/admin/definir-senha`,
       });
     if (inviteError) throw new Error(inviteError.message);
 

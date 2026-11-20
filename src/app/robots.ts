@@ -1,9 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { getSiteUrl } from '@/lib/site';
 
-export default function robots(): MetadataRoute.Robots {
+export default async function robots(): Promise<MetadataRoute.Robots> {
   return {
     rules: { userAgent: '*', allow: '/', disallow: '/admin' },
-    sitemap: `${getSiteUrl()}/sitemap.xml`,
+    sitemap: `${await getSiteUrl()}/sitemap.xml`,
   };
 }

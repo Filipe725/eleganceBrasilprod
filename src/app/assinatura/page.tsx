@@ -39,7 +39,7 @@ export default async function AssinaturaPage() {
   let planos: PlanoAssinatura[] = [];
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from('planos_assinatura')
       .select('*')

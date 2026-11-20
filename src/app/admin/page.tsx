@@ -38,7 +38,7 @@ export default async function AdminPage() {
   let configError = false;
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const {
       data: { user: fetchedUser },

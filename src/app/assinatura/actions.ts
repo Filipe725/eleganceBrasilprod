@@ -103,7 +103,7 @@ export async function cadastrarAssinatura(
   }
 
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     const { data: plano } = await supabase
       .from('planos_assinatura')
