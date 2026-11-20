@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, Lock, ShieldAlert, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -12,18 +12,51 @@ type Status = 'validating' | 'ready' | 'invalid';
 const LINK_TIMEOUT_MS = 12000;
 
 /**
- * Destino do link de convite/recuperação (`inviteUserByEmail`). O Supabase
- * autentica a pessoa via token no hash/query da URL assim que o SDK do
- * navegador carrega — por isso o middleware libera esta rota mesmo sem
- * cookie de sessão ainda existir na primeira requisição.
+ * Troca o token do link (convite/recuperação) por uma sessão e devolve o
+ * e-mail da conta ('' se ausente) ou null se o link for inválido.
  *
- * IMPORTANTE: nunca tratamos "existe uma sessão" como prova de que o
- * convite é válido. O navegador guarda uma única sessão por origem — se
- * o link já tiver sido consumido (reenvio, clique duplo, scanner de
- * e-mail) ou for aberto num navegador onde OUTRO admin já está logado,
- * o SDK do Supabase mantém a sessão antiga intacta e não dispara nada.
- * Só avançamos quando o próprio evento de autenticação (SIGNED_IN /
- * PASSWORD_RECOVERY) disparar em resposta ao token desta URL.
+ * O cliente do @supabase/ssr usa fluxo PKCE e RECUSA tokens no hash
+ * (#access_token=...) — exatamente o formato dos links de convite e
+ * recuperação gerados no servidor. Por isso a troca é feita aqui,
+ * explicitamente, e só o resultado DESTA troca libera o formulário: uma
+ * sessão anterior no navegador nunca conta como prova.
+ */
+async function exchangeLinkToken(): Promise<string | null> {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const query = new URLSearchParams(window.location.search);
+  const accessToken = hash.get('access_token');
+  const refreshToken = hash.get('refresh_token');
+  const tokenHash = query.get('token_hash');
+  const otpType = query.get('type');
+
+  // Tira os tokens da barra de endereço/histórico assim que lidos.
+  window.history.replaceState(null, '', window.location.pathname);
+
+  try {
+    const supabase = createClient();
+    if (tokenHash) {
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType === 'invite' ? 'invite' : 'recovery',
+      });
+      return error || !data.session ? null : (data.session.user.email ?? '');
+    }
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      return error || !data.session ? null : (data.session.user.email ?? '');
+    }
+  } catch {
+    // Falha de rede ou token malformado: trata como link inválido.
+  }
+  return null;
+}
+
+/**
+ * Destino do link de convite/recuperação. O middleware libera esta rota
+ * sem cookie de sessão: a sessão nasce aqui, da troca do token da URL.
  */
 export default function DefinirSenhaPage() {
   const router = useRouter();
@@ -34,37 +67,37 @@ export default function DefinirSenhaPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  // Token de uso único: a troca roda UMA vez mesmo que o efeito rode de
+  // novo (Strict Mode em dev monta → desmonta → monta).
+  const exchangeRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
-    const hasUrlToken =
-      window.location.hash.includes('access_token=') ||
-      new URLSearchParams(window.location.search).has('token_hash');
-
-    if (!hasUrlToken) {
-      setStatus('invalid');
-      return;
+    if (!exchangeRef.current) {
+      exchangeRef.current = exchangeLinkToken();
     }
+    let cancelled = false;
 
-    const supabase = createClient();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && session) {
-        setAccountEmail(session.user.email ?? null);
-        setStatus('ready');
-      }
-    });
-
-    // Token inválido/já consumido: o Supabase não emite evento nenhum e
-    // preserva silenciosamente qualquer sessão anterior. Sem esse
-    // timeout, a tela ficaria presa em "Validando convite..." para
-    // sempre — e sem ele um dev futuro poderia "corrigir" isso caindo
-    // de volta em getSession(), reabrindo exatamente esta falha.
+    // Rede travada: não deixa a tela presa em "Validando convite...".
     const timeout = setTimeout(() => {
-      setStatus((current) => (current === 'validating' ? 'invalid' : current));
+      if (!cancelled) {
+        setStatus((current) => (current === 'validating' ? 'invalid' : current));
+      }
     }, LINK_TIMEOUT_MS);
 
+    exchangeRef.current
+      .then((email) => {
+        if (cancelled) return;
+        if (email === null) {
+          setStatus('invalid');
+          return;
+        }
+        setAccountEmail(email || null);
+        setStatus('ready');
+      })
+      .finally(() => clearTimeout(timeout));
+
     return () => {
-      listener.subscription.unsubscribe();
+      cancelled = true;
       clearTimeout(timeout);
     };
   }, []);
@@ -124,7 +157,7 @@ export default function DefinirSenhaPage() {
               </p>
               <p className="text-xs leading-relaxed text-cream/50">
                 Peça para um admin enviar um novo convite pela aba
-                &ldquo;Admins&rdquo; do painel — e abra o link em uma aba
+                &ldquo;Equipe&rdquo; do painel — e abra o link em uma aba
                 onde ninguém mais esteja logado.
               </p>
             </div>
