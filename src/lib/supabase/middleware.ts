@@ -53,13 +53,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Estar logado não basta: só quem está na tabela `admins` pode usar o
-  // painel. Sem essa checagem, qualquer conta autenticada (não só admins)
-  // conseguia ver o dashboard — a RLS já bloqueava a escrita, mas não a
-  // leitura/exibição da tela.
-  const { data: isAdmin } = await supabase.rpc('is_admin');
+  // Estar logado não basta: só quem está na equipe (tabela `admins`, com
+  // papel admin ou vendedor) pode usar o painel. O que cada papel pode
+  // fazer lá dentro é decidido pela RLS e pelas Server Actions.
+  const { data: isEquipe } = await supabase.rpc('is_equipe');
 
-  if (!isAdmin) {
+  if (!isEquipe) {
     // evita loop de redirecionamento / deixa terminar o fluxo de convite
     if (isLoginPage || isSetPasswordPage) return response;
     const url = request.nextUrl.clone();

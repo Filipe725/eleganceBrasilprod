@@ -22,7 +22,7 @@ import type {
 import { createClient } from '@/lib/supabase/client';
 import { deleteImages } from '@/lib/upload';
 import { matchesSearch } from '@/store/search-store';
-import type { AdminUser } from '@/app/admin/actions';
+import type { AdminUser, PapelEquipe } from '@/app/admin/actions';
 import { PERFUME_SELECT } from '@/lib/decants';
 import { PerfumeForm, type DecantInput, type PerfumeFormData } from './PerfumeForm';
 import { PerfumeList } from './PerfumeList';
@@ -41,6 +41,11 @@ interface AdminDashboardProps {
   initialPlanos: PlanoAssinatura[];
   initialAssinantes: Assinante[];
   currentUserId: string;
+  /**
+   * Só controla o que aparece na tela. A permissão de verdade está na RLS
+   * (migration 011) e nas Server Actions — esconder aqui é conveniência.
+   */
+  papel: PapelEquipe;
 }
 
 type Tab = 'perfumes' | 'banners' | 'hero' | 'assinaturas' | 'admins';
@@ -58,7 +63,9 @@ export function AdminDashboard({
   initialPlanos,
   initialAssinantes,
   currentUserId,
+  papel,
 }: AdminDashboardProps) {
+  const isAdmin = papel === 'admin';
   const [tab, setTab] = useState<Tab>('perfumes');
   const [perfumes, setPerfumes] = useState<Perfume[]>(initialPerfumes);
   const [seccoes, setSeccoes] = useState<BannerSeccao[]>(initialSeccoes);
@@ -258,27 +265,31 @@ export function AdminDashboard({
           <GalleryHorizontal className="h-4 w-4" aria-hidden />
           Hero &amp; Carrossel
         </button>
-        <button
-          type="button"
-          onClick={() => setTab('assinaturas')}
-          className={tabClass(tab === 'assinaturas')}
-        >
-          <Package className="h-4 w-4" aria-hidden />
-          Assinaturas
-          {assinantesPendentes > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wine px-1 text-[11px] font-bold text-white">
-              {assinantesPendentes}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('admins')}
-          className={tabClass(tab === 'admins')}
-        >
-          <ShieldCheck className="h-4 w-4" aria-hidden />
-          Admins
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              type="button"
+              onClick={() => setTab('assinaturas')}
+              className={tabClass(tab === 'assinaturas')}
+            >
+              <Package className="h-4 w-4" aria-hidden />
+              Assinaturas
+              {assinantesPendentes > 0 && (
+                <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-wine px-1 text-[11px] font-bold text-white">
+                  {assinantesPendentes}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('admins')}
+              className={tabClass(tab === 'admins')}
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              Equipe
+            </button>
+          </>
+        )}
       </div>
 
       {feedback && (
@@ -371,7 +382,7 @@ export function AdminDashboard({
                 setEditing(perfume);
                 setShowForm(true);
               }}
-              onDelete={setPerfumeToDelete}
+              onDelete={isAdmin ? setPerfumeToDelete : undefined}
               onToggleActive={handleToggleActive}
             />
           )}
@@ -396,7 +407,7 @@ export function AdminDashboard({
         />
       )}
 
-      {tab === 'assinaturas' && (
+      {isAdmin && tab === 'assinaturas' && (
         <AssinaturasManager
           planos={planos}
           onPlanosChange={setPlanos}
@@ -406,7 +417,7 @@ export function AdminDashboard({
         />
       )}
 
-      {tab === 'admins' && (
+      {isAdmin && tab === 'admins' && (
         <AdminUsersManager
           initialAdmins={initialAdmins}
           currentUserId={currentUserId}

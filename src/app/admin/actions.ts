@@ -5,9 +5,19 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSiteUrl } from '@/lib/site';
 
+/** Papel na equipe do painel (coluna `admins.papel`, migration 011). */
+export type PapelEquipe = 'admin' | 'vendedor';
+
+const PAPEIS: PapelEquipe[] = ['admin', 'vendedor'];
+
+function papelValido(papel: unknown): papel is PapelEquipe {
+  return typeof papel === 'string' && (PAPEIS as string[]).includes(papel);
+}
+
 export interface AdminUser {
   user_id: string;
   email: string;
+  papel: PapelEquipe;
   created_at: string;
 }
 
@@ -27,7 +37,11 @@ function errorMessage(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
 
-/** Garante que quem chamou a action está logado e é admin; lança erro caso contrário. */
+/**
+ * Garante que quem chamou a action está logado e tem papel 'admin';
+ * lança erro caso contrário. Vendedores não passam daqui: gerenciar a
+ * equipe (convidar, remover, trocar papel) é exclusivo de admin.
+ */
 async function requireAdmin() {
   const supabase = await createClient();
   const {
@@ -57,7 +71,7 @@ async function listAllUsers(admin: ReturnType<typeof createAdminClient>) {
   }
 }
 
-/** Lista os admins atuais (e-mail + data de autorização). */
+/** Lista a equipe atual (e-mail, papel e data de autorização). */
 export async function getAdminUsers(): Promise<ActionResult<AdminUser[]>> {
   try {
     await requireAdmin();
@@ -66,7 +80,7 @@ export async function getAdminUsers(): Promise<ActionResult<AdminUser[]>> {
 
     const { data: rows, error } = await admin
       .from('admins')
-      .select('user_id, created_at')
+      .select('user_id, papel, created_at')
       .order('created_at', { ascending: true });
     if (error) throw new Error(error.message);
     if (!rows || rows.length === 0) return { ok: true, data: [] };
@@ -77,6 +91,7 @@ export async function getAdminUsers(): Promise<ActionResult<AdminUser[]>> {
     const data = rows.map((row) => ({
       user_id: row.user_id,
       email: emailById.get(row.user_id) ?? '(usuário removido)',
+      papel: papelValido(row.papel) ? row.papel : 'admin',
       created_at: row.created_at,
     }));
 
@@ -86,14 +101,20 @@ export async function getAdminUsers(): Promise<ActionResult<AdminUser[]>> {
   }
 }
 
-/** Convida um novo admin por e-mail: cria a conta e já autoriza na tabela `admins`. */
-export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser>> {
+/** Convida um membro da equipe por e-mail: cria a conta e já autoriza com o papel escolhido. */
+export async function inviteAdmin(
+  email: string,
+  papel: PapelEquipe = 'admin'
+): Promise<ActionResult<AdminUser>> {
   try {
     await requireAdmin();
 
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
       throw new Error('Informe um e-mail válido.');
+    }
+    if (!papelValido(papel)) {
+      throw new Error('Papel inválido.');
     }
 
     const admin = createAdminClient();
@@ -124,7 +145,7 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
 
     const { error: insertError } = await admin
       .from('admins')
-      .insert({ user_id: invited.user.id });
+      .insert({ user_id: invited.user.id, papel });
     if (insertError) {
       throw new Error(
         `Convite enviado, mas falha ao autorizar como admin: ${insertError.message}`
@@ -136,6 +157,7 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
       data: {
         user_id: invited.user.id,
         email: invited.user.email ?? trimmedEmail,
+        papel,
         created_at: new Date().toISOString(),
       },
     };
@@ -144,7 +166,38 @@ export async function inviteAdmin(email: string): Promise<ActionResult<AdminUser
   }
 }
 
-/** Revoga o acesso de admin (não apaga a conta — só remove de `admins`). */
+/**
+ * Troca o papel de um membro da equipe. Não deixa o admin rebaixar a si
+ * mesmo — evita ficar sem nenhum admin e trancado fora da aba de equipe.
+ */
+export async function changeAdminRole(
+  userId: string,
+  papel: PapelEquipe
+): Promise<ActionResult<null>> {
+  try {
+    const caller = await requireAdmin();
+
+    if (!papelValido(papel)) throw new Error('Papel inválido.');
+    if (userId === caller.id) {
+      throw new Error('Você não pode alterar o seu próprio papel.');
+    }
+
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('admins')
+      .update({ papel })
+      .eq('user_id', userId)
+      .select('user_id');
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) throw new Error('Membro não encontrado na equipe.');
+
+    return { ok: true, data: null };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err, 'Erro ao alterar o papel.') };
+  }
+}
+
+/** Revoga o acesso ao painel (não apaga a conta — só remove de `admins`). */
 export async function revokeAdmin(userId: string): Promise<ActionResult<null>> {
   try {
     const caller = await requireAdmin();

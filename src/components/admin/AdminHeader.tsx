@@ -4,12 +4,14 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Sparkles, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { STORE_NAME } from '@/lib/constants';
+import type { PapelEquipe } from '@/app/admin/actions';
 
 interface AdminHeaderProps {
   userEmail: string;
+  papel: PapelEquipe;
 }
 
-export function AdminHeader({ userEmail }: AdminHeaderProps) {
+export function AdminHeader({ userEmail, papel }: AdminHeaderProps) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -26,7 +28,10 @@ export function AdminHeader({ userEmail }: AdminHeaderProps) {
           <Sparkles className="h-5 w-5 text-gold-400" aria-hidden />
           <div>
             <p className="font-display leading-tight text-cream">
-              {STORE_NAME} <span className="text-gold-400">Admin</span>
+              {STORE_NAME}{' '}
+              <span className="text-gold-400">
+                {papel === 'admin' ? 'Admin' : 'Vendas'}
+              </span>
             </p>
             <p className="hidden text-xs text-cream/50 sm:block">{userEmail}</p>
           </div>

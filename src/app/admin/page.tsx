@@ -12,7 +12,7 @@ import type {
 import { PERFUME_SELECT } from '@/lib/decants';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { getAdminUsers, type AdminUser } from './actions';
+import { getAdminUsers, type AdminUser, type PapelEquipe } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +28,7 @@ export default async function AdminPage() {
   // isso lança erro — sem capturar aqui, o painel derrubava a página
   // inteira em vez de mandar para o login.
   let user: User | null = null;
+  let isEquipe = false;
   let isAdmin = false;
   let perfumes: Perfume[] = [];
   let seccoes: BannerSeccao[] = [];
@@ -46,11 +47,20 @@ export default async function AdminPage() {
     user = fetchedUser;
 
     if (user) {
-      const { data: adminCheck } = await supabase.rpc('is_admin');
-      isAdmin = Boolean(adminCheck);
+      const [equipeCheck, adminCheck] = await Promise.all([
+        supabase.rpc('is_equipe'),
+        supabase.rpc('is_admin'),
+      ]);
+      isEquipe = Boolean(equipeCheck.data);
+      isAdmin = Boolean(adminCheck.data);
     }
 
-    if (user && isAdmin) {
+    if (user && isEquipe) {
+      // Assinaturas (dados pessoais) e planos só são buscados para admin;
+      // para vendedor a RLS já devolveria vazio, mas nem pedimos.
+      const somenteAdmin = <T,>(query: PromiseLike<T>) =>
+        isAdmin ? query : Promise.resolve(null);
+
       const [
         perfumesRes,
         seccoesRes,
@@ -72,21 +82,25 @@ export default async function AdminPage() {
             .select('*')
             .order('ordem', { ascending: true }),
           supabase.from('hero_config').select('*').eq('id', 1).maybeSingle(),
-          supabase
-            .from('planos_assinatura')
-            .select('*')
-            .order('ordem', { ascending: true }),
-          supabase
-            .from('assinantes')
-            .select('*')
-            .order('created_at', { ascending: false }),
+          somenteAdmin(
+            supabase
+              .from('planos_assinatura')
+              .select('*')
+              .order('ordem', { ascending: true })
+          ),
+          somenteAdmin(
+            supabase
+              .from('assinantes')
+              .select('*')
+              .order('created_at', { ascending: false })
+          ),
         ]);
       perfumes = perfumesRes.data ?? [];
       seccoes = seccoesRes.data ?? [];
       heroSlides = heroSlidesRes.data ?? [];
       heroConfig = heroConfigRes.data ?? DEFAULT_HERO_CONFIG;
-      planos = planosRes.data ?? [];
-      assinantes = assinantesRes.data ?? [];
+      planos = planosRes?.data ?? [];
+      assinantes = assinantesRes?.data ?? [];
     }
   } catch {
     configError = true;
@@ -98,18 +112,20 @@ export default async function AdminPage() {
   if (!user) {
     redirect('/admin/login');
   }
-  if (!isAdmin) {
+  if (!isEquipe) {
     redirect('/admin/login?erro=sem-permissao');
   }
 
-  // SUPABASE_SERVICE_ROLE_KEY ausente ou falha ao listar: a aba "Admins"
-  // fica vazia em vez de derrubar o painel inteiro.
-  const adminsResult = await getAdminUsers();
-  const admins: AdminUser[] = adminsResult.ok ? adminsResult.data : [];
+  const papel: PapelEquipe = isAdmin ? 'admin' : 'vendedor';
+
+  // SUPABASE_SERVICE_ROLE_KEY ausente ou falha ao listar: a aba "Equipe"
+  // fica vazia em vez de derrubar o painel inteiro. Vendedor nem consulta.
+  const adminsResult = isAdmin ? await getAdminUsers() : null;
+  const admins: AdminUser[] = adminsResult?.ok ? adminsResult.data : [];
 
   return (
     <div className="min-h-dvh bg-cream">
-      <AdminHeader userEmail={user.email ?? ''} />
+      <AdminHeader userEmail={user.email ?? ''} papel={papel} />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <AdminDashboard
           initialPerfumes={perfumes}
@@ -120,6 +136,7 @@ export default async function AdminPage() {
           initialPlanos={planos}
           initialAssinantes={assinantes}
           currentUserId={user.id}
+          papel={papel}
         />
       </main>
     </div>

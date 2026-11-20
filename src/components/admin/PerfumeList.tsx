@@ -8,7 +8,8 @@ import { formatBRL } from '@/lib/format';
 interface PerfumeListProps {
   perfumes: Perfume[];
   onEdit: (perfume: Perfume) => void;
-  onDelete: (perfume: Perfume) => void;
+  /** Ausente = sem permissão de excluir (vendedor): o botão não aparece. */
+  onDelete?: (perfume: Perfume) => void;
   onToggleActive: (perfume: Perfume) => void;
 }
 
@@ -96,15 +97,17 @@ export function PerfumeList({
             >
               <Pencil className="h-5 w-5" aria-hidden />
             </button>
-            <button
-              type="button"
-              onClick={() => onDelete(perfume)}
-              aria-label={`Excluir ${perfume.nome}`}
-              title="Excluir"
-              className="tap-target flex items-center justify-center rounded-xl text-ink-700/60 transition hover:bg-red-50 hover:text-red-600"
-            >
-              <Trash2 className="h-5 w-5" aria-hidden />
-            </button>
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(perfume)}
+                aria-label={`Excluir ${perfume.nome}`}
+                title="Excluir"
+                className="tap-target flex items-center justify-center rounded-xl text-ink-700/60 transition hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-5 w-5" aria-hidden />
+              </button>
+            )}
           </div>
         </li>
       ))}
