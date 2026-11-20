@@ -6,52 +6,69 @@ import { CheckCircle2, Loader2, Lock, ShieldAlert, Sparkles } from 'lucide-react
 import { createClient } from '@/lib/supabase/client';
 import { STORE_NAME } from '@/lib/constants';
 
-type Status = 'validating' | 'ready' | 'invalid';
+type Status = 'validating' | 'confirm' | 'ready' | 'invalid';
 
 /** Tempo máximo esperando o Supabase trocar o token da URL por uma sessão. */
 const LINK_TIMEOUT_MS = 12000;
 
+type LinkToken =
+  | { kind: 'session'; accessToken: string; refreshToken: string }
+  | { kind: 'otp'; tokenHash: string; type: 'invite' | 'recovery' };
+
 /**
- * Troca o token do link (convite/recuperação) por uma sessão e devolve o
- * e-mail da conta ('' se ausente) ou null se o link for inválido.
- *
- * O cliente do @supabase/ssr usa fluxo PKCE e RECUSA tokens no hash
- * (#access_token=...) — exatamente o formato dos links de convite e
- * recuperação gerados no servidor. Por isso a troca é feita aqui,
- * explicitamente, e só o resultado DESTA troca libera o formulário: uma
- * sessão anterior no navegador nunca conta como prova.
+ * Lê o token do link (convite/recuperação) e o tira da barra de
+ * endereço/histórico. Dois formatos:
+ * - `?token_hash=...&type=...` — modelo de e-mail apontando para cá. O
+ *   token só é gasto quando a pessoa clica em "Continuar": verificadores
+ *   de link de e-mail corporativo abrem a URL, mas não clicam.
+ * - `#access_token=...` — link padrão do Supabase, que já passou pelo
+ *   /verify (o token já foi gasto lá; aqui só vira sessão).
  */
-async function exchangeLinkToken(): Promise<string | null> {
+function readLinkToken(): LinkToken | null {
   const hash = new URLSearchParams(window.location.hash.slice(1));
   const query = new URLSearchParams(window.location.search);
-  const accessToken = hash.get('access_token');
-  const refreshToken = hash.get('refresh_token');
-  const tokenHash = query.get('token_hash');
-  const otpType = query.get('type');
-
-  // Tira os tokens da barra de endereço/histórico assim que lidos.
   window.history.replaceState(null, '', window.location.pathname);
 
-  try {
-    const supabase = createClient();
-    if (tokenHash) {
-      const { data, error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: otpType === 'invite' ? 'invite' : 'recovery',
-      });
-      return error || !data.session ? null : (data.session.user.email ?? '');
-    }
-    if (accessToken && refreshToken) {
-      const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-      return error || !data.session ? null : (data.session.user.email ?? '');
-    }
-  } catch {
-    // Falha de rede ou token malformado: trata como link inválido.
+  const tokenHash = query.get('token_hash');
+  if (tokenHash) {
+    return {
+      kind: 'otp',
+      tokenHash,
+      type: query.get('type') === 'invite' ? 'invite' : 'recovery',
+    };
+  }
+  const accessToken = hash.get('access_token');
+  const refreshToken = hash.get('refresh_token');
+  if (accessToken && refreshToken) {
+    return { kind: 'session', accessToken, refreshToken };
   }
   return null;
+}
+
+/**
+ * Troca o token por uma sessão e devolve o e-mail da conta ('' se
+ * ausente) ou null se o link for inválido.
+ *
+ * O cliente do @supabase/ssr usa fluxo PKCE e RECUSA tokens no hash
+ * (#access_token=...), por isso a troca é feita aqui, explicitamente — e
+ * só o resultado DESTA troca libera o formulário: uma sessão anterior no
+ * navegador nunca conta como prova.
+ */
+async function exchangeLinkToken(token: LinkToken): Promise<string | null> {
+  try {
+    const supabase = createClient();
+    const { data, error } =
+      token.kind === 'otp'
+        ? await supabase.auth.verifyOtp({ token_hash: token.tokenHash, type: token.type })
+        : await supabase.auth.setSession({
+            access_token: token.accessToken,
+            refresh_token: token.refreshToken,
+          });
+    return error || !data.session ? null : (data.session.user.email ?? '');
+  } catch {
+    // Falha de rede ou token malformado: trata como link inválido.
+    return null;
+  }
 }
 
 /**
@@ -67,26 +84,27 @@ export default function DefinirSenhaPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
-  // Token de uso único: a troca roda UMA vez mesmo que o efeito rode de
-  // novo (Strict Mode em dev monta → desmonta → monta).
+  // O token é lido (e apagado da URL) uma única vez, mesmo que o efeito
+  // rode de novo (Strict Mode em dev monta → desmonta → monta); a troca,
+  // que gasta o token de uso único, também só acontece uma vez.
+  const tokenRef = useRef<LinkToken | null | undefined>(undefined);
   const exchangeRef = useRef<Promise<string | null> | null>(null);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    if (!exchangeRef.current) {
-      exchangeRef.current = exchangeLinkToken();
-    }
-    let cancelled = false;
+  function startExchange(token: LinkToken) {
+    if (!exchangeRef.current) exchangeRef.current = exchangeLinkToken(token);
+    setStatus('validating');
 
     // Rede travada: não deixa a tela presa em "Validando link...".
     const timeout = setTimeout(() => {
-      if (!cancelled) {
+      if (mountedRef.current) {
         setStatus((current) => (current === 'validating' ? 'invalid' : current));
       }
     }, LINK_TIMEOUT_MS);
 
     exchangeRef.current
       .then((email) => {
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         if (email === null) {
           setStatus('invalid');
           return;
@@ -95,10 +113,19 @@ export default function DefinirSenhaPage() {
         setStatus('ready');
       })
       .finally(() => clearTimeout(timeout));
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    if (tokenRef.current === undefined) tokenRef.current = readLinkToken();
+    const token = tokenRef.current;
+
+    if (!token) setStatus('invalid');
+    else if (token.kind === 'otp' && !exchangeRef.current) setStatus('confirm');
+    else startExchange(token);
 
     return () => {
-      cancelled = true;
-      clearTimeout(timeout);
+      mountedRef.current = false;
     };
   }, []);
 
@@ -147,6 +174,21 @@ export default function DefinirSenhaPage() {
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Validando link...
             </p>
+          )}
+
+          {status === 'confirm' && !done && (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <p className="text-sm text-cream/80">
+                Clique em continuar para criar sua senha de acesso ao painel.
+              </p>
+              <button
+                type="button"
+                onClick={() => tokenRef.current && startExchange(tokenRef.current)}
+                className="tap-target flex w-full items-center justify-center gap-2 rounded-xl bg-gold-500 px-4 py-3.5 font-semibold text-ink-950 transition hover:bg-gold-400"
+              >
+                Continuar
+              </button>
+            </div>
           )}
 
           {status === 'invalid' && !done && (
