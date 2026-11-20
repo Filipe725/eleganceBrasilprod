@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { Loader2, Mail, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
+import { KeyRound, Loader2, Mail, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react';
 import {
   changeAdminRole,
   inviteAdmin,
   revokeAdmin,
+  sendPasswordResetToMember,
   type AdminUser,
   type PapelEquipe,
 } from '@/app/admin/actions';
@@ -91,6 +92,22 @@ export function AdminUsersManager({
         current.map((a) => (a.user_id === member.user_id ? { ...a, papel } : a))
       );
       notify(`${member.email} agora é ${PAPEL_LABEL[papel]}.`);
+    } catch {
+      notify(NETWORK_ERROR);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSendReset(member: AdminUser) {
+    setBusyId(member.user_id);
+    try {
+      const result = await sendPasswordResetToMember(member.user_id);
+      notify(
+        result.ok
+          ? `Link de redefinição de senha enviado para ${result.data.email}.`
+          : result.error
+      );
     } catch {
       notify(NETWORK_ERROR);
     } finally {
@@ -203,7 +220,7 @@ export function AdminUsersManager({
                   Sua conta
                 </span>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={admin.papel}
                     disabled={busy}
@@ -216,6 +233,16 @@ export function AdminUsersManager({
                     <option value="vendedor">{PAPEL_LABEL.vendedor}</option>
                     <option value="admin">{PAPEL_LABEL.admin}</option>
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => void handleSendReset(admin)}
+                    disabled={busy}
+                    title="Envia um e-mail para a pessoa criar uma nova senha"
+                    className="tap-target inline-flex items-center gap-1.5 rounded-xl border border-ink-700/20 px-4 py-2 text-xs font-semibold text-ink-700 transition hover:bg-ink-900/5 disabled:opacity-50"
+                  >
+                    <KeyRound className="h-3.5 w-3.5" aria-hidden />
+                    Redefinir senha
+                  </button>
                   <button
                     type="button"
                     onClick={() => setAdminToRevoke(admin)}

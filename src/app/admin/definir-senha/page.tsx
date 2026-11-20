@@ -77,7 +77,7 @@ export default function DefinirSenhaPage() {
     }
     let cancelled = false;
 
-    // Rede travada: não deixa a tela presa em "Validando convite...".
+    // Rede travada: não deixa a tela presa em "Validando link...".
     const timeout = setTimeout(() => {
       if (!cancelled) {
         setStatus((current) => (current === 'validating' ? 'invalid' : current));
@@ -145,7 +145,7 @@ export default function DefinirSenhaPage() {
           {status === 'validating' && !done && (
             <p className="flex items-center justify-center gap-2 py-6 text-sm text-cream/60">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Validando convite...
+              Validando link...
             </p>
           )}
 
@@ -153,12 +153,12 @@ export default function DefinirSenhaPage() {
             <div className="flex flex-col items-center gap-3 py-6 text-center">
               <ShieldAlert className="h-8 w-8 text-red-400" aria-hidden />
               <p className="text-sm text-cream/80">
-                Link de convite inválido, expirado ou já utilizado.
+                Link inválido, expirado ou já utilizado.
               </p>
               <p className="text-xs leading-relaxed text-cream/50">
-                Peça para um admin enviar um novo convite pela aba
-                &ldquo;Equipe&rdquo; do painel — e abra o link em uma aba
-                onde ninguém mais esteja logado.
+                Peça um novo link em &ldquo;Esqueci minha senha&rdquo; na
+                tela de login (ou a um admin, pela aba &ldquo;Equipe&rdquo;) e
+                abra-o em uma aba onde ninguém mais esteja logado.
               </p>
             </div>
           )}

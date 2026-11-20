@@ -197,6 +197,83 @@ export async function changeAdminRole(
   }
 }
 
+/**
+ * Dispara o e-mail de redefinição de senha do Supabase. O link volta
+ * para /admin/definir-senha no domínio oficial (NEXT_PUBLIC_SITE_URL),
+ * que troca o token por uma sessão e pede a nova senha.
+ */
+async function sendRecoveryEmail(email: string) {
+  const admin = createAdminClient();
+  const { error } = await admin.auth.resetPasswordForEmail(email, {
+    redirectTo: `${await getSiteUrl()}/admin/definir-senha`,
+  });
+  if (error) {
+    throw new Error(
+      /rate limit/i.test(error.message)
+        ? 'Limite de e-mails atingido. Aguarde alguns minutos e tente de novo.'
+        : error.message
+    );
+  }
+}
+
+/**
+ * "Esqueci minha senha" da tela de login (pública, sem sessão). Só envia
+ * o e-mail se o endereço for de alguém da equipe, e SEMPRE responde do
+ * mesmo jeito — a tela nunca revela se um e-mail está ou não cadastrado.
+ */
+export async function requestPasswordReset(email: string): Promise<ActionResult<null>> {
+  const trimmedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!trimmedEmail || !trimmedEmail.includes('@') || trimmedEmail.length > 254) {
+    return { ok: false, error: 'Informe um e-mail válido.' };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const users = await listAllUsers(admin);
+    const user = users.find((u) => (u.email ?? '').toLowerCase() === trimmedEmail);
+    if (user) {
+      const { data: membro } = await admin
+        .from('admins')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (membro) await sendRecoveryEmail(trimmedEmail);
+    }
+  } catch (err) {
+    // Loga no servidor, mas não devolve detalhes: a resposta é a mesma.
+    console.error('requestPasswordReset:', errorMessage(err, 'erro desconhecido'));
+  }
+  return { ok: true, data: null };
+}
+
+/** Admin envia o e-mail de redefinição de senha para um membro da equipe. */
+export async function sendPasswordResetToMember(
+  userId: string
+): Promise<ActionResult<{ email: string }>> {
+  try {
+    await requireAdmin();
+
+    const admin = createAdminClient();
+    const { data: membro, error: membroError } = await admin
+      .from('admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (membroError) throw new Error(membroError.message);
+    if (!membro) throw new Error('Membro não encontrado na equipe.');
+
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (error) throw new Error(error.message);
+    const email = data.user.email;
+    if (!email) throw new Error('Esta conta não tem e-mail cadastrado.');
+
+    await sendRecoveryEmail(email);
+    return { ok: true, data: { email } };
+  } catch (err) {
+    return { ok: false, error: errorMessage(err, 'Erro ao enviar a redefinição de senha.') };
+  }
+}
+
 /** Revoga o acesso ao painel (não apaga a conta — só remove de `admins`). */
 export async function revokeAdmin(userId: string): Promise<ActionResult<null>> {
   try {
