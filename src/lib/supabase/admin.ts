@@ -1,3 +1,5 @@
+// Erro de build se algum componente de cliente importar este arquivo.
+import 'server-only';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 /**
