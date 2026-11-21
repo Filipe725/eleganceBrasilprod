@@ -9,6 +9,14 @@ export const ALLOWED_IMAGE_TYPES = [
 ];
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
+/** Extensão do arquivo salvo vem do tipo validado, nunca do nome enviado. */
+const EXTENSION_BY_TYPE: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+};
+
 /**
  * Valida tipo e tamanho de uma imagem antes do upload. Retorna a
  * mensagem de erro em português, ou `null` se o arquivo é válido.
@@ -33,13 +41,17 @@ export async function uploadImage(file: File, folder = ''): Promise<string> {
   if (validationError) throw new Error(validationError);
 
   const supabase = createClient();
-  const extension = file.name.split('.').pop() ?? 'jpg';
+  const extension = EXTENSION_BY_TYPE[file.type] ?? 'jpg';
   const name = `${crypto.randomUUID()}.${extension}`;
   const path = folder ? `${folder}/${name}` : name;
 
   const { error } = await supabase.storage
     .from('perfumes')
-    .upload(path, file, { cacheControl: '3600', upsert: false });
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    });
 
   if (error) throw new Error(`Falha no upload da imagem: ${error.message}`);
 

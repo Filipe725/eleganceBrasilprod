@@ -52,6 +52,14 @@ function texto(value: unknown): string {
 const JANELA_DUPLICADO_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Teto global de cadastros novos por hora. Um robô que troque e-mail e
+ * WhatsApp a cada envio passa pelo bloqueio de duplicados; este limite
+ * impede que ele encha o painel. Bem acima do movimento real da loja.
+ */
+const LIMITE_CADASTROS_POR_HORA = 30;
+const UMA_HORA_MS = 60 * 60 * 1000;
+
+/**
  * Cadastro público no clube de decants. A tabela `assinantes` NÃO aceita
  * INSERT do público (migration 009): o único caminho é esta action, que
  * valida tudo no servidor e grava com a service role. Assim a validação,
@@ -135,6 +143,18 @@ export async function cadastrarAssinatura(
     ]);
     if ((porEmail.count ?? 0) > 0 || (porWhatsapp.count ?? 0) > 0) {
       return { ok: true };
+    }
+
+    const { count: ultimaHora } = await admin
+      .from('assinantes')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', new Date(Date.now() - UMA_HORA_MS).toISOString());
+    if ((ultimaHora ?? 0) >= LIMITE_CADASTROS_POR_HORA) {
+      return {
+        ok: false,
+        error:
+          'Recebemos muitos cadastros agora. Tente de novo em alguns minutos ou fale com a gente pelo WhatsApp.',
+      };
     }
 
     const { error } = await admin.from('assinantes').insert({
