@@ -38,13 +38,13 @@ export function CartItemRow({ item }: CartItemRowProps) {
       <div className="flex flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted/70">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
               {perfume.marca}
             </p>
             <h3 className="text-sm font-semibold leading-snug text-ink-900">
               {perfume.nome}
             </h3>
-            <p className="text-xs text-ink-700/70">
+            <p className="text-xs text-ink-700">
               {perfume.familia_olfativa.join(', ')}
               {opcao && ` • ${opcao}`}
             </p>
@@ -53,7 +53,7 @@ export function CartItemRow({ item }: CartItemRowProps) {
             type="button"
             onClick={() => removeItem(key)}
             aria-label={`Remover ${perfume.nome}`}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-700/60 transition hover:bg-red-50 hover:text-red-600"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-700 transition hover:bg-red-50 hover:text-red-600"
           >
             <Trash2 className="h-4 w-4" aria-hidden />
           </button>

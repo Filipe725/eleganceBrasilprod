@@ -60,7 +60,7 @@ export function Header() {
       <div className="mx-auto grid h-16 max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 sm:px-6">
         {/* Busca — campo fixo no desktop, lupa que expande no mobile */}
         <div className="flex items-center">
-          <label className="hidden w-full max-w-xs items-center gap-2 rounded-full border border-ink-700/15 bg-white px-4 py-2.5 text-sm text-ink-900 sm:flex">
+          <label className="hidden w-full max-w-xs items-center gap-2 rounded-full border border-ink-700/15 bg-white px-4 py-2.5 text-sm text-ink-900 focus-within:border-gold-600 focus-within:ring-1 focus-within:ring-gold-600 sm:flex">
             <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
             <input
               ref={inputRef}
@@ -70,7 +70,7 @@ export function Header() {
               onFocus={goToHomeIfNeeded}
               placeholder="O que você está buscando?"
               aria-label="Buscar perfume por nome, marca, família olfativa ou notas olfativas"
-              className="w-full bg-transparent placeholder:text-muted/60 focus:outline-none"
+              className="w-full bg-transparent placeholder:text-muted/80 focus:outline-none"
             />
           </label>
           <button
@@ -137,7 +137,7 @@ export function Header() {
       {/* Campo de busca expandido (mobile) */}
       {isOpen && (
         <div className="border-t border-gold-400/20 bg-cream/95 px-5 py-3 backdrop-blur-md sm:hidden">
-          <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <div className="mx-auto flex max-w-6xl items-center gap-2 rounded-lg px-2 focus-within:ring-2 focus-within:ring-gold-600">
             <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
             <input
               ref={mobileInputRef}
@@ -147,9 +147,9 @@ export function Header() {
               onKeyDown={(event) => {
                 if (event.key === 'Escape') closeSearch();
               }}
-              placeholder="Buscar por nome, marca, família olfativa ou notas..."
+              placeholder="Buscar por nome, marca, família olfativa ou notas…"
               aria-label="Buscar perfume por nome, marca, família olfativa ou notas olfativas"
-              className="w-full bg-transparent py-2 text-base text-ink-900 placeholder:text-muted/50 focus:outline-none"
+              className="w-full bg-transparent py-2 text-base text-ink-900 placeholder:text-muted/80 focus:outline-none"
             />
             <button
               type="button"

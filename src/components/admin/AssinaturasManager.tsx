@@ -590,7 +590,7 @@ function AssinanteCard({
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Conversar com ${assinante.nome} no WhatsApp`}
-          className="tap-target flex items-center justify-center rounded-xl bg-[#25D366] px-3 text-white transition hover:brightness-105"
+          className="tap-target flex items-center justify-center rounded-xl bg-whatsapp px-3 text-white transition hover:bg-whatsapp-dark"
         >
           <MessageCircle className="h-5 w-5" aria-hidden />
         </a>

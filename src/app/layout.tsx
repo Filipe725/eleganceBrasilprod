@@ -52,6 +52,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${display.variable} ${sans.variable}`}>
       <body className="font-sans">
+        {/* Primeiro item do Tab: pula cabeçalho e menu (teclado/leitor de tela) */}
+        <a
+          href="#conteudo"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-ink-900 focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-cream"
+        >
+          Pular para o conteúdo
+        </a>
         {children}
         <FloatingWhatsApp />
         {/* Meta Pixel: carregado só após o aceite de cookies (LGPD) */}

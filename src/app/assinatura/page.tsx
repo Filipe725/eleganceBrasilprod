@@ -53,7 +53,7 @@ export default async function AssinaturaPage() {
   return (
     <>
       <Header />
-      <main className="pt-[108px]">
+      <main id="conteudo" tabIndex={-1} className="pt-[108px] focus:outline-none">
         {/* Abertura */}
         <section className="bg-ink-900 text-cream">
           <div className="mx-auto max-w-4xl px-5 py-14 text-center sm:px-6 sm:py-20">
@@ -91,7 +91,7 @@ export default async function AssinaturaPage() {
                 <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gold-300/40 text-gold-600">
                   <Icon className="h-6 w-6" aria-hidden />
                 </span>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted/70">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                   Passo {index + 1}
                 </p>
                 <h3 className="mt-1 font-display text-lg font-semibold text-ink-900">

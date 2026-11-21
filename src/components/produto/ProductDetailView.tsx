@@ -113,7 +113,7 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
                   type="button"
                   onClick={fotoAnterior}
                   aria-label="Foto anterior"
-                  className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-ink-900 shadow-md transition hover:bg-white"
+                  className="absolute left-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-ink-900 shadow-md transition hover:bg-white"
                 >
                   <ChevronLeft className="h-5 w-5" aria-hidden />
                 </button>
@@ -121,7 +121,7 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
                   type="button"
                   onClick={proximaFoto}
                   aria-label="Próxima foto"
-                  className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-ink-900 shadow-md transition hover:bg-white"
+                  className="absolute right-3 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-ink-900 shadow-md transition hover:bg-white"
                 >
                   <ChevronRight className="h-5 w-5" aria-hidden />
                 </button>
@@ -138,7 +138,7 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
                   onClick={() => setFotoAtiva(index)}
                   aria-label={`Ir para foto ${index + 1}`}
                   aria-current={fotoAtiva === index}
-                  className={`h-1.5 rounded-full transition-all ${
+                  className={`h-1.5 rounded-full transition-[width,background-color] motion-reduce:transition-none ${
                     fotoAtiva === index
                       ? 'w-6 bg-ink-900'
                       : 'w-1.5 bg-ink-900/25 hover:bg-ink-900/40'
@@ -161,7 +161,7 @@ export function ProductDetailView({ perfume }: ProductDetailViewProps) {
 
         <div className="mt-4">
           {discount !== null && perfume.preco_antigo != null && (
-            <p className="text-sm text-muted/70 line-through">
+            <p className="text-sm text-muted line-through">
               {formatBRL(perfume.preco_antigo)}
             </p>
           )}

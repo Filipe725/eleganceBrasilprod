@@ -23,7 +23,7 @@ export function FloatingWhatsApp() {
       href={href}
       source="floating_button"
       aria-label="Tirar dúvidas pelo WhatsApp"
-      className="fixed bottom-5 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xl shadow-ink-950/25 transition hover:scale-105 hover:brightness-105 active:scale-95"
+      className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-[calc(1.25rem+env(safe-area-inset-right))] z-30 flex h-14 w-14 items-center justify-center rounded-full bg-whatsapp text-white shadow-xl shadow-ink-950/25 transition hover:scale-105 hover:bg-whatsapp-dark active:scale-95"
     >
       <MessageCircle className="h-7 w-7" aria-hidden />
     </WhatsAppLink>

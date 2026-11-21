@@ -9,12 +9,16 @@ import { PERFUME_SELECT, cartItemPrice } from '@/lib/decants';
 import { buildWhatsAppOrderLink } from '@/lib/whatsapp';
 import { trackWhatsAppCheckout } from '@/lib/meta-pixel';
 import { formatBRL } from '@/lib/format';
+import { useDialogFocus } from '@/lib/use-dialog-focus';
 import { CartItemRow } from './CartItemRow';
 
 export function CartDrawer() {
   const { items, isOpen, closeCart, clearCart, syncPerfumes } = useCartStore();
   const total = useCartStore(selectCartTotal);
   const [aviso, setAviso] = useState<string | null>(null);
+  // "Esvaziar carrinho" pede confirmação antes de apagar tudo
+  const [confirmarLimpar, setConfirmarLimpar] = useState(false);
+  const dialogRef = useDialogFocus<HTMLDivElement>(isOpen, closeCart);
 
   // O carrinho guarda uma cópia do perfume no localStorage: ao abrir a
   // gaveta, busca os dados atuais no banco para o pedido nunca sair com
@@ -22,6 +26,7 @@ export function CartDrawer() {
   useEffect(() => {
     if (!isOpen) {
       setAviso(null);
+      setConfirmarLimpar(false);
       return;
     }
     const salvos = useCartStore.getState().items;
@@ -96,25 +101,22 @@ export function CartDrawer() {
     };
   }, [isOpen]);
 
-  // Fecha com a tecla Esc
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeCart();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, closeCart]);
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Carrinho de compras">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 z-50 overscroll-contain"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Carrinho de compras"
+    >
       {/* Overlay */}
       <button
         type="button"
         onClick={closeCart}
         aria-label="Fechar carrinho"
+        tabIndex={-1}
         className="absolute inset-0 animate-fade-in bg-ink-950/40 backdrop-blur-md"
       />
 
@@ -128,7 +130,8 @@ export function CartDrawer() {
           <button
             type="button"
             onClick={closeCart}
-            aria-label="Fechar"
+            aria-label="Fechar carrinho"
+            data-autofocus
             className="tap-target flex items-center justify-center rounded-full text-ink-700 transition hover:bg-ink-900/5"
           >
             <X className="h-6 w-6" aria-hidden />
@@ -159,7 +162,7 @@ export function CartDrawer() {
           </div>
         ) : (
           <>
-            <ul className="flex-1 divide-y divide-ink-700/10 overflow-y-auto px-4 sm:px-6">
+            <ul className="flex-1 divide-y divide-ink-700/10 overflow-y-auto overscroll-contain px-4 sm:px-6">
               {items.map((item) => (
                 <CartItemRow key={cartItemKey(item)} item={item} />
               ))}
@@ -181,7 +184,7 @@ export function CartDrawer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleCheckout}
-                className="tap-target flex w-full items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-4 text-base font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.98]"
+                className="tap-target flex w-full items-center justify-center gap-2 rounded-lg bg-whatsapp px-4 py-4 text-base font-bold text-white shadow-md transition hover:bg-whatsapp-dark active:scale-[0.98]"
               >
                 <MessageCircle className="h-5 w-5" aria-hidden />
                 Finalizar Pedido
@@ -190,14 +193,41 @@ export function CartDrawer() {
                 Você será redirecionado ao WhatsApp com o resumo do pedido.
               </p>
 
-              <button
-                type="button"
-                onClick={clearCart}
-                className="mx-auto flex items-center gap-1.5 px-2 py-2 text-xs text-ink-700/70 transition hover:text-red-600"
-              >
-                <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                Esvaziar carrinho
-              </button>
+              {confirmarLimpar ? (
+                <div
+                  role="group"
+                  aria-label="Confirmar esvaziar carrinho"
+                  className="flex items-center justify-center gap-2 text-xs"
+                >
+                  <span className="text-ink-700">Remover todos os itens?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearCart();
+                      setConfirmarLimpar(false);
+                    }}
+                    className="rounded-full bg-red-600 px-3 py-2 font-semibold text-white transition hover:bg-red-700"
+                  >
+                    Esvaziar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmarLimpar(false)}
+                    className="rounded-full border border-ink-700/25 px-3 py-2 font-semibold text-ink-800 transition hover:bg-ink-900/5"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmarLimpar(true)}
+                  className="mx-auto flex items-center gap-1.5 px-2 py-2 text-xs text-ink-700 transition hover:text-red-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                  Esvaziar carrinho
+                </button>
+              )}
             </footer>
           </>
         )}

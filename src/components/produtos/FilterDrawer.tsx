@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 import { formatBRL } from '@/lib/format';
+import { useDialogFocus } from '@/lib/use-dialog-focus';
 
 export interface Filters {
   generos: string[];
@@ -47,6 +48,7 @@ export function FilterDrawer({
   const [precoMax, setPrecoMax] = useState(
     current.precoMax ?? facets.precoTeto
   );
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose);
 
   function toggle(list: string[], setList: (v: string[]) => void, item: string) {
     setList(
@@ -95,7 +97,7 @@ export function FilterDrawer({
       </summary>
       <div className="space-y-1 pb-4">
         {options.length === 0 ? (
-          <p className="text-sm text-muted/70">Nenhuma opção disponível.</p>
+          <p className="text-sm text-muted">Nenhuma opção disponível.</p>
         ) : (
           options.map((option) => (
             <label
@@ -117,11 +119,18 @@ export function FilterDrawer({
   );
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Filtrar produtos">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 z-50 overscroll-contain"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Filtrar produtos"
+    >
       <button
         type="button"
         onClick={onClose}
         aria-label="Fechar filtros"
+        tabIndex={-1}
         className="absolute inset-0 animate-fade-in bg-ink-950/40 backdrop-blur-sm"
       />
 
@@ -133,14 +142,15 @@ export function FilterDrawer({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fechar"
+            aria-label="Fechar filtros"
+            data-autofocus
             className="tap-target flex items-center justify-center rounded-full text-muted transition hover:bg-ink-900/5"
           >
             <X className="h-6 w-6" aria-hidden />
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5">
           {checkboxGroup('Gênero', facets.generos, generos, setGeneros)}
           {checkboxGroup(
             'Família Olfativa',

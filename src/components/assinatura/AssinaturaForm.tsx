@@ -22,7 +22,7 @@ interface AssinaturaFormProps {
 }
 
 const inputClass =
-  'w-full rounded-xl border border-ink-700/20 bg-white px-4 py-3 text-ink-900 placeholder:text-ink-700/40 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600';
+  'w-full rounded-xl border border-ink-700/20 bg-white px-4 py-3 text-ink-900 placeholder:text-ink-700/80 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600';
 const labelClass = 'mb-1.5 block text-sm font-medium text-ink-800';
 
 /**
@@ -101,27 +101,38 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
     setErro(null);
     setEnviando(true);
 
-    const result = await cadastrarAssinatura({
-      plano_id: planoId,
-      nome,
-      email,
-      whatsapp,
-      cep,
-      endereco,
-      numero,
-      complemento,
-      bairro,
-      cidade,
-      uf,
-      genero_preferido: genero,
-      familias_preferidas: preferidas,
-      familias_evitar: evitar,
-      observacoes,
-      aceite_termos: aceite,
-      site,
-    });
+    let result: Awaited<ReturnType<typeof cadastrarAssinatura>>;
+    try {
+      result = await cadastrarAssinatura({
+        plano_id: planoId,
+        nome,
+        email,
+        whatsapp,
+        cep,
+        endereco,
+        numero,
+        complemento,
+        bairro,
+        cidade,
+        uf,
+        genero_preferido: genero,
+        familias_preferidas: preferidas,
+        familias_evitar: evitar,
+        observacoes,
+        aceite_termos: aceite,
+        site,
+      });
+    } catch {
+      // Falha de rede antes de chegar ao servidor: sem isso o botão ficava
+      // preso em "Enviando…" para sempre.
+      setErro(
+        'Não foi possível enviar agora. Verifique sua conexão e tente de novo.'
+      );
+      return;
+    } finally {
+      setEnviando(false);
+    }
 
-    setEnviando(false);
     if (!result.ok) {
       setErro(result.error);
       return;
@@ -149,7 +160,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
           <WhatsAppLink
             href={buildWhatsAppLink(mensagem)}
             source="assinatura_cadastro"
-            className="tap-target mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-8 py-4 text-base font-bold text-white shadow-md transition hover:brightness-105"
+            className="tap-target mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-whatsapp px-8 py-4 text-base font-bold text-white shadow-md transition hover:bg-whatsapp-dark"
           >
             <MessageCircle className="h-5 w-5" aria-hidden />
             Combinar pagamento
@@ -190,7 +201,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="email" className={labelClass}>E-mail *</label>
-            <input id="email" type="email" required autoComplete="email" value={email}
+            <input id="email" type="email" required autoComplete="email" spellCheck={false} value={email}
               onChange={(e) => setEmail(e.target.value)} className={inputClass} />
           </div>
           <div>
@@ -240,7 +251,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
             <label htmlFor="complemento" className={labelClass}>Complemento</label>
             <input id="complemento" autoComplete="address-line2" value={complemento}
               onChange={(e) => setComplemento(e.target.value)} className={inputClass}
-              placeholder="Apto, bloco, referência..." />
+              placeholder="Apto, bloco, referência…" />
           </div>
           <div>
             <label htmlFor="bairro" className={labelClass}>Bairro *</label>
@@ -313,7 +324,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
           </label>
           <textarea id="observacoes" rows={3} maxLength={1000} value={observacoes}
             onChange={(e) => setObservacoes(e.target.value)} className={inputClass}
-            placeholder="Perfumes que já usa e ama, alergias, ocasiões de uso..." />
+            placeholder="Perfumes que já usa e ama, alergias, ocasiões de uso…" />
         </div>
       </fieldset>
 
@@ -348,7 +359,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
       <button type="submit" disabled={enviando || !planoId}
         className="tap-target flex w-full items-center justify-center gap-2 rounded-xl bg-charcoal px-6 py-4 text-sm font-bold uppercase tracking-[0.1em] text-white transition hover:bg-ink-950 active:scale-[0.98] disabled:opacity-60">
         {enviando && <Loader2 className="h-5 w-5 animate-spin" aria-hidden />}
-        {enviando ? 'Enviando...' : 'Assinar plano decant'}
+        {enviando ? 'Enviando…' : 'Assinar plano decant'}
       </button>
     </form>
   );

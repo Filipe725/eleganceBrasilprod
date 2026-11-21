@@ -123,7 +123,7 @@ export default async function ProdutoPage({ params }: ProdutoPageProps) {
         }}
       />
       <Header />
-      <main className="pt-[108px]">
+      <main id="conteudo" tabIndex={-1} className="pt-[108px] focus:outline-none">
         <ProductDetailView perfume={perfume} />
         <RelatedProducts perfumes={relacionados} />
       </main>

@@ -35,7 +35,7 @@ export default async function ProdutosPage() {
   return (
     <>
       <Header />
-      <main className="pt-[108px]">
+      <main id="conteudo" tabIndex={-1} className="pt-[108px] focus:outline-none">
         <ProductsExplorer initialPerfumes={perfumes} />
       </main>
       <Footer />

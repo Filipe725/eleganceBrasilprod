@@ -3,8 +3,22 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    scroll-behavior: smooth;
+  /* Rolagem suave só para quem não pediu "reduzir movimento" no sistema */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /*
+   * Foco visível para quem navega pelo teclado (não aparece no clique).
+   * Anel escuro + halo claro: fica visível tanto no creme da loja quanto
+   * nos fundos azul-marinho (hero, painel, gavetas).
+   */
+  :focus-visible {
+    outline: 2px solid theme('colors.gold.600');
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px theme('colors.cream.DEFAULT');
   }
 
   body {

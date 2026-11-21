@@ -71,6 +71,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={loading}
+            autoFocus
             className="tap-target rounded-xl border border-ink-700/25 px-5 py-2.5 text-sm font-semibold text-ink-800 transition hover:bg-ink-900/5 disabled:opacity-50"
           >
             {cancelLabel}
@@ -79,7 +80,6 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            autoFocus
             className={`tap-target inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition disabled:opacity-60 ${
               danger
                 ? 'bg-red-600 hover:bg-red-700'

@@ -126,7 +126,7 @@ export default async function AdminPage() {
   return (
     <div className="min-h-dvh bg-cream">
       <AdminHeader userEmail={user.email ?? ''} papel={papel} />
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <main id="conteudo" tabIndex={-1} className="mx-auto max-w-5xl px-4 py-8 focus:outline-none sm:px-6">
         <AdminDashboard
           initialPerfumes={perfumes}
           initialSeccoes={seccoes}

@@ -56,7 +56,7 @@ export default async function HomePage() {
   return (
     <>
       <Header />
-      <main>
+      <main id="conteudo" tabIndex={-1} className="focus:outline-none">
         <Hero slides={getActiveHeroSlides(heroSlides)} config={heroConfig} />
         <TrustBar />
         <HomeContent perfumes={perfumes} seccoes={seccoes} />

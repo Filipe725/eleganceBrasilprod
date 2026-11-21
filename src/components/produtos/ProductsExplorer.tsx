@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowUpDown,
   ChevronRight,
@@ -56,14 +57,68 @@ function filterAndSort(all: Perfume[], f: Filters, sort: SortKey): Perfume[] {
   return filtrados;
 }
 
+const SORT_KEYS: SortKey[] = ['menor-preco', 'maior-preco', 'lancamentos'];
+const DEFAULT_SORT: SortKey = 'lancamentos';
+
+/** Nome do parâmetro na URL para cada lista de filtros (repetível). */
+const LIST_PARAMS = {
+  generos: 'genero',
+  familias: 'familia',
+  tamanhos: 'tamanho',
+  marcas: 'marca',
+} as const;
+
+function readPrice(value: string | null): number | null {
+  if (value === null || value.trim() === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Filtros e ordenação vêm da URL: voltar de um produto mantém a busca. */
+function readState(params: URLSearchParams): { filters: Filters; sort: SortKey } {
+  const ordem = params.get('ordem');
+  return {
+    filters: {
+      generos: params.getAll(LIST_PARAMS.generos),
+      familias: params.getAll(LIST_PARAMS.familias),
+      tamanhos: params.getAll(LIST_PARAMS.tamanhos),
+      marcas: params.getAll(LIST_PARAMS.marcas),
+      precoMin: readPrice(params.get('min')),
+      precoMax: readPrice(params.get('max')),
+    },
+    sort: SORT_KEYS.includes(ordem as SortKey) ? (ordem as SortKey) : DEFAULT_SORT,
+  };
+}
+
+function toQueryString(filters: Filters, sort: SortKey): string {
+  const params = new URLSearchParams();
+  for (const [key, param] of Object.entries(LIST_PARAMS) as [
+    keyof typeof LIST_PARAMS,
+    string,
+  ][]) {
+    filters[key].forEach((value) => params.append(param, value));
+  }
+  if (filters.precoMin !== null) params.set('min', String(filters.precoMin));
+  if (filters.precoMax !== null) params.set('max', String(filters.precoMax));
+  if (sort !== DEFAULT_SORT) params.set('ordem', sort);
+  return params.toString();
+}
+
 /**
  * Catálogo completo (/produtos): breadcrumb, barra sticky com
  * "Ordenar" e "Filtrar", e grid 2 col. mobile / 4 col. desktop.
- * Filtros e ordenação rodam no cliente sobre o catálogo vindo do servidor.
+ * Filtros e ordenação rodam no cliente sobre o catálogo vindo do servidor
+ * e ficam na URL (?familia=...&ordem=...): dá para voltar, recarregar e
+ * compartilhar a busca filtrada.
  */
 export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [sort, setSort] = useState<SortKey>('lancamentos');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { filters, sort } = useMemo(
+    () => readState(new URLSearchParams(searchParams.toString())),
+    [searchParams]
+  );
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
 
@@ -105,13 +160,19 @@ export function ProductsExplorer({ initialPerfumes }: ProductsExplorerProps) {
     [initialPerfumes, filters, sort]
   );
 
+  // replace (não push): filtrar não enche o histórico do "voltar"
+  function updateUrl(nextFilters: Filters, nextSort: SortKey) {
+    const qs = toQueryString(nextFilters, nextSort);
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
+
   function applyFilters(next: Filters) {
-    setFilters(next);
+    updateUrl(next, sort);
     setShowFilter(false);
   }
 
   function applySort(next: SortKey) {
-    setSort(next);
+    updateUrl(filters, next);
     setShowSort(false);
   }
 

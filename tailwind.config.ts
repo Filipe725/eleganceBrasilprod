@@ -28,6 +28,12 @@ const config: Config = {
         charcoal: '#1b1c1c',  // on-surface
         muted: '#414846',     // on-surface-variant
         wine: '#9B3259',      // badges de desconto e preço promocional
+        // Verde do WhatsApp escurecido: o #25D366 oficial com texto branco
+        // dá contraste 1,98:1; este passa no WCAG AA (5:1).
+        whatsapp: {
+          DEFAULT: '#15803d',
+          dark: '#166534',
+        },
       },
       fontFamily: {
         display: ['var(--font-display)', 'Playfair Display', 'Georgia', 'serif'],

@@ -1,8 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type TouchEvent,
+} from 'react';
 import { getImageProps } from 'next/image';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import type { HeroConfig, HeroSlide } from '@/lib/types';
 import { isSafeLink } from '@/lib/link';
 
@@ -30,8 +37,10 @@ const FALLBACK_SLIDE: HeroSlide = {
 };
 
 /**
- * Hero da Home: carrossel de slides com rotação automática, pausa ao
- * passar o mouse, setas, dots e swipe no mobile. Conteúdo, artes e o
+ * Hero da Home: carrossel de slides com rotação automática, setas, dots
+ * e swipe no mobile. A rotação para com o mouse em cima, com o foco do
+ * teclado dentro do carrossel, pelo botão de pausa (WCAG 2.2.2) e não
+ * começa para quem ativou "reduzir movimento" no sistema. Conteúdo, artes e o
  * intervalo de rotação vêm do painel admin (tabelas `hero_slides` e
  * `hero_config`); sem slides cadastrados, cai no slide estático padrão.
  */
@@ -41,8 +50,23 @@ export function Hero({ slides, config }: HeroProps) {
   const intervalMs = Math.max(2, config.intervalo_segundos || 4) * 1000;
 
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
   const touchStartX = useRef<number | null>(null);
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduceMotion(query.matches);
+    const onChange = (event: MediaQueryListEvent) => setReduceMotion(event.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  const autoplayDisponivel = multiple && config.autoplay_ativo;
+  const rodando =
+    autoplayDisponivel && !hovered && !focused && !userPaused && !reduceMotion;
 
   const goTo = useCallback(
     (next: number) => {
@@ -51,15 +75,21 @@ export function Hero({ slides, config }: HeroProps) {
     [items.length]
   );
 
-  // Rotação automática — pausa no hover, some se só houver 1 slide ou
-  // se o autoplay estiver desligado no admin.
+  // Rotação automática (some se só houver 1 slide ou se o autoplay
+  // estiver desligado no admin)
   useEffect(() => {
-    if (!multiple || !config.autoplay_ativo || paused) return;
+    if (!rodando) return;
     const timer = setInterval(() => {
       setIndex((current) => (current + 1) % items.length);
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [multiple, config.autoplay_ativo, paused, intervalMs, items.length]);
+  }, [rodando, intervalMs, items.length]);
+
+  function handleBlur(event: FocusEvent<HTMLElement>) {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setFocused(false);
+    }
+  }
 
   function handleTouchStart(event: TouchEvent<HTMLElement>) {
     touchStartX.current = event.touches[0]?.clientX ?? null;
@@ -76,14 +106,18 @@ export function Hero({ slides, config }: HeroProps) {
   return (
     <section
       className="relative mt-[124px] aspect-[4/5] w-full overflow-hidden sm:aspect-[16/5]"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={handleBlur}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       role="region"
       aria-roledescription="carrossel"
       aria-label="Destaques ÉléganceBrasil"
     >
+      {/* Enquanto gira sozinho, não anuncia cada troca ao leitor de tela */}
+      <div aria-live={rodando ? 'off' : 'polite'} className="contents">
       {items.map((slide, i) => (
         <HeroSlideView
           key={slide.id}
@@ -92,6 +126,7 @@ export function Hero({ slides, config }: HeroProps) {
           priority={i === 0}
         />
       ))}
+      </div>
 
       {multiple && (
         <>
@@ -120,12 +155,28 @@ export function Hero({ slides, config }: HeroProps) {
                 onClick={() => goTo(i)}
                 aria-label={`Ir para o slide ${i + 1}`}
                 aria-current={i === index}
-                className={`h-2 rounded-full transition-all ${
+                className={`h-2 rounded-full transition-[width,background-color] motion-reduce:transition-none ${
                   i === index ? 'w-7 bg-white' : 'w-2 bg-white/50 hover:bg-white/80'
                 }`}
               />
             ))}
           </div>
+
+          {autoplayDisponivel && !reduceMotion && (
+            <button
+              type="button"
+              onClick={() => setUserPaused((current) => !current)}
+              aria-label={userPaused ? 'Retomar carrossel' : 'Pausar carrossel'}
+              aria-pressed={userPaused}
+              className="absolute bottom-3 right-3 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-ink-900 shadow-card backdrop-blur transition hover:bg-white sm:bottom-5 sm:right-5"
+            >
+              {userPaused ? (
+                <Play className="h-4 w-4" aria-hidden />
+              ) : (
+                <Pause className="h-4 w-4" aria-hidden />
+              )}
+            </button>
+          )}
         </>
       )}
     </section>
@@ -189,7 +240,7 @@ function HeroSlideView({
 
   return (
     <div
-      className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+      className={`absolute inset-0 transition-opacity duration-700 ease-in-out motion-reduce:transition-none ${
         active ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       aria-hidden={!active}

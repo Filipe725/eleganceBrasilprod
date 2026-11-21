@@ -29,7 +29,7 @@ export function ProductCard({ perfume }: ProductCardProps) {
   // Mais de uma opção (vários tamanhos ou decants): escolhe na página do produto
   const temVariasOpcoes = perfume.tamanho.length > 1 || decantMinimo !== null;
   const ctaClass =
-    'tap-target mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-charcoal px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-ink-950 active:scale-95 sm:text-sm';
+    'tap-target mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-charcoal px-4 py-3 text-xs font-bold uppercase tracking-[0.1em] text-white transition hover:bg-ink-950 active:scale-95 sm:text-sm';
 
   return (
     <article className="group flex h-full flex-col">
@@ -58,7 +58,7 @@ export function ProductCard({ perfume }: ProductCardProps) {
         </div>
 
         <div className="flex flex-1 flex-col px-1 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted/70">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-muted">
             {perfume.marca}
           </p>
           <h3 className="mb-1 font-display text-lg font-semibold leading-snug text-ink-900">
@@ -74,7 +74,7 @@ export function ProductCard({ perfume }: ProductCardProps) {
           <div className="mt-auto pt-2">
             {perfume.preco_antigo != null &&
               perfume.preco_antigo > perfume.preco_atual && (
-                <p className="text-xs text-muted/70 line-through">
+                <p className="text-xs text-muted line-through">
                   {formatBRL(perfume.preco_antigo)}
                 </p>
               )}

@@ -29,7 +29,7 @@ export default function FaleConoscoPage() {
         <WhatsAppLink
           href={whatsappLink}
           source="fale_conosco"
-          className="tap-target flex items-center gap-4 rounded-xl bg-[#25D366] p-5 text-white shadow-md transition hover:brightness-105 active:scale-[0.99]"
+          className="tap-target flex items-center gap-4 rounded-xl bg-whatsapp p-5 text-white shadow-md transition hover:bg-whatsapp-dark active:scale-[0.99]"
         >
           <MessageCircle className="h-8 w-8 shrink-0" aria-hidden />
           <span>

@@ -78,7 +78,7 @@ function AdminLoginForm() {
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-ink-950 px-4">
+    <main id="conteudo" tabIndex={-1} className="flex min-h-dvh items-center justify-center bg-ink-950 px-4 focus:outline-none">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Sparkles className="mx-auto h-8 w-8 text-gold-400" aria-hidden />

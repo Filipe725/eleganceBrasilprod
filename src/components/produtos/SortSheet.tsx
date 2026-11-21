@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Sparkles, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { useDialogFocus } from '@/lib/use-dialog-focus';
 
 export type SortKey = 'menor-preco' | 'maior-preco' | 'lancamentos';
 
@@ -22,12 +23,21 @@ interface SortSheetProps {
 
 /** Menu inferior (bottom sheet) de ordenação do catálogo. */
 export function SortSheet({ current, onSelect, onClose }: SortSheetProps) {
+  const dialogRef = useDialogFocus<HTMLDivElement>(true, onClose);
+
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Ordenar produtos">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 z-50 overscroll-contain"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Ordenar produtos"
+    >
       <button
         type="button"
         onClick={onClose}
-        aria-label="Fechar"
+        aria-label="Fechar ordenação"
+        tabIndex={-1}
         className="absolute inset-0 animate-fade-in bg-ink-950/40 backdrop-blur-sm"
       />
       <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-cream p-5 shadow-2xl sm:mx-auto sm:max-w-md">
@@ -51,6 +61,8 @@ export function SortSheet({ current, onSelect, onClose }: SortSheetProps) {
               <button
                 type="button"
                 onClick={() => onSelect(key)}
+                aria-pressed={current === key}
+                {...(current === key ? { 'data-autofocus': true } : {})}
                 className={`tap-target flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium transition ${
                   current === key
                     ? 'bg-ink-900 text-white'
