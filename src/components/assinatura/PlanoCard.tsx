@@ -70,7 +70,7 @@ export function PlanoCard({ plano, selecionado, destaque, onSelect }: PlanoCardP
 
       <div className="flex items-start justify-between gap-4">
         <span
-          className={`text-[11px] font-semibold uppercase tracking-[0.28em] ${
+          className={`font-display text-2xl font-semibold ${
             destaque ? 'text-gold-400' : 'text-gold-600'
           }`}
         >
@@ -103,7 +103,7 @@ export function PlanoCard({ plano, selecionado, destaque, onSelect }: PlanoCardP
 
       <span className="flex-1" />
       <span
-        className={`mt-5 flex items-center gap-2 border-t pt-4 text-xs font-semibold uppercase tracking-[0.15em] ${
+        className={`mt-5 flex items-center gap-2 border-t pt-4 text-sm font-semibold ${
           destaque ? 'border-cream/15' : 'border-ink-900/10'
         } ${selecionado ? '' : suave}`}
       >
@@ -118,7 +118,7 @@ export function PlanoCard({ plano, selecionado, destaque, onSelect }: PlanoCardP
             />
           )}
         </span>
-        {selecionado ? 'Plano escolhido' : 'Escolher'}
+        {selecionado ? 'Plano escolhido' : 'Escolher este plano'}
       </span>
     </label>
   );

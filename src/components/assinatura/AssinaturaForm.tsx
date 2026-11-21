@@ -173,7 +173,7 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Planos */}
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="sr-only">Plano</legend>
         <div className="grid gap-3 md:grid-cols-3">
           {planos.map((p, index) => (
@@ -189,8 +189,8 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
       </fieldset>
 
       {/* Contato */}
-      <fieldset className="space-y-4 rounded-2xl bg-white p-5 shadow-card sm:p-6">
-        <legend className="mb-1 font-display text-lg font-semibold text-ink-900">
+      <fieldset className="min-w-0 [&>legend+*]:clear-left space-y-4 rounded-2xl bg-white p-5 shadow-card sm:p-6">
+        <legend className="float-left mb-4 w-full font-display text-xl font-semibold text-ink-900">
           Seus dados
         </legend>
         <div>
@@ -215,8 +215,8 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
       </fieldset>
 
       {/* Endereço */}
-      <fieldset className="space-y-4 rounded-2xl bg-white p-5 shadow-card sm:p-6">
-        <legend className="mb-1 font-display text-lg font-semibold text-ink-900">
+      <fieldset className="min-w-0 [&>legend+*]:clear-left space-y-4 rounded-2xl bg-white p-5 shadow-card sm:p-6">
+        <legend className="float-left mb-4 w-full font-display text-xl font-semibold text-ink-900">
           Endereço de entrega
         </legend>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -273,11 +273,11 @@ export function AssinaturaForm({ planos }: AssinaturaFormProps) {
       </fieldset>
 
       {/* Perfil olfativo */}
-      <fieldset className="space-y-5 rounded-2xl bg-white p-5 shadow-card sm:p-6">
-        <legend className="mb-1 font-display text-lg font-semibold text-ink-900">
+      <fieldset className="min-w-0 [&>legend+*]:clear-left space-y-5 rounded-2xl bg-white p-5 shadow-card sm:p-6">
+        <legend className="float-left mb-4 w-full font-display text-xl font-semibold text-ink-900">
           Seu perfil olfativo
         </legend>
-        <p className="-mt-2 text-xs text-muted">
+        <p className="clear-left text-sm text-muted">
           É com isso que nossa curadoria escolhe seus decants todo mês.
         </p>
 

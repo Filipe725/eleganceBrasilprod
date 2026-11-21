@@ -52,10 +52,16 @@ const config: Config = {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        // Líquido subindo no frasco (Clube de Decants)
+        'fill-up': {
+          from: { transform: 'scaleY(0)' },
+          to: { transform: 'scaleY(1)' },
+        },
       },
       animation: {
         'slide-in': 'slide-in 0.25s ease-out',
         'fade-in': 'fade-in 0.2s ease-out',
+        'fill-up': 'fill-up 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both',
       },
     },
   },
