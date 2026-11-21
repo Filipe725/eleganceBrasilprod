@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import {
   ChevronDown,
+  ClipboardCopy,
+  Download,
   Loader2,
   MessageCircle,
   Plus,
@@ -21,6 +23,7 @@ import {
   whatsappDoAssinante,
 } from '@/lib/assinatura';
 import { STORE_NAME } from '@/lib/constants';
+import { linhaPlanilha, paraColar, paraCsv } from '@/lib/export-assinantes';
 import { ConfirmDialog } from './ConfirmDialog';
 
 interface AssinaturasManagerProps {
@@ -29,6 +32,11 @@ interface AssinaturasManagerProps {
   assinantes: Assinante[];
   onAssinantesChange: (assinantes: Assinante[]) => void;
   notify: (message: string) => void;
+  /**
+   * Admin: edita planos, muda status e exclui cadastros. Vendedor(a):
+   * só vê e exporta (a RLS também barra as escritas — migration 012).
+   */
+  podeEditar: boolean;
 }
 
 const inputClass =
@@ -49,7 +57,8 @@ function parseDecimal(value: string): number {
 /**
  * Aba "Assinaturas" do painel: planos do clube de decants (CRUD) e os
  * cadastros feitos em /assinatura, com status (pendente → ativo depois
- * de combinar o pagamento pelo WhatsApp), preferências e endereço.
+ * de combinar o pagamento pelo WhatsApp), preferências e endereço, e a
+ * exportação para a planilha "Controle de Assinantes".
  */
 export function AssinaturasManager({
   planos,
@@ -57,20 +66,54 @@ export function AssinaturasManager({
   assinantes,
   onAssinantesChange,
   notify,
+  podeEditar,
 }: AssinaturasManagerProps) {
   const [creating, setCreating] = useState(false);
   const [planoToDelete, setPlanoToDelete] = useState<PlanoAssinatura | null>(null);
   const [assinanteToDelete, setAssinanteToDelete] = useState<Assinante | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [filtro, setFiltro] = useState<StatusAssinante | 'todos'>('todos');
+  // Exportar só quem se cadastrou a partir desta data (evita repetir na
+  // planilha quem já foi importado antes). Vazio = todos do filtro.
+  const [desde, setDesde] = useState('');
 
   const ordenados = [...planos].sort((a, b) => a.ordem - b.ordem);
   const planoPorId = useMemo(
     () => new Map(planos.map((plano) => [plano.id, plano])),
     [planos]
   );
-  const visiveis =
-    filtro === 'todos' ? assinantes : assinantes.filter((a) => a.status === filtro);
+  const visiveis = assinantes.filter(
+    (a) =>
+      (filtro === 'todos' || a.status === filtro) &&
+      // created_at é ISO (UTC); compara pela data local do cadastro
+      (!desde || dataLocal(a.created_at) >= desde)
+  );
+  // Planilha em ordem de chegada (a lista do painel mostra os mais novos primeiro)
+  const linhasExportacao = [...visiveis]
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((a) => linhaPlanilha(a, a.plano_id ? planoPorId.get(a.plano_id) : undefined));
+
+  async function handleCopiar() {
+    try {
+      await navigator.clipboard.writeText(paraColar(linhasExportacao));
+      const n = linhasExportacao.length;
+      notify(
+        `${n} ${n === 1 ? 'linha copiada' : 'linhas copiadas'}. Na planilha, clique na primeira célula vazia da coluna Cliente e cole (Ctrl+V).`
+      );
+    } catch {
+      notify('Não foi possível copiar. Use “Baixar CSV”.');
+    }
+  }
+
+  function handleBaixarCsv() {
+    const blob = new Blob([paraCsv(linhasExportacao)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `assinantes-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function handleCreatePlano() {
     setCreating(true);
@@ -154,7 +197,8 @@ export function AssinaturasManager({
 
   return (
     <div className="space-y-10">
-      {/* ---------------- Planos ---------------- */}
+      {/* ---------------- Planos (só admin) ---------------- */}
+      {podeEditar && (
       <section className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -202,16 +246,24 @@ export function AssinaturasManager({
           </ul>
         )}
       </section>
+      )}
 
       {/* ---------------- Assinantes ---------------- */}
       <section className="space-y-4">
         <div>
-          <h2 className="font-display text-xl text-ink-900">
-            Assinantes ({assinantes.length})
-          </h2>
-          <p className="text-sm text-ink-700/70">
-            Cadastros chegam como &ldquo;Pendente&rdquo;. Combine o pagamento pelo
-            WhatsApp e mude para &ldquo;Ativo&rdquo;.
+          {podeEditar ? (
+            <h2 className="font-display text-xl text-ink-900">
+              Assinantes ({assinantes.length})
+            </h2>
+          ) : (
+            <h1 className="font-display text-2xl text-ink-900">
+              Assinantes do clube ({assinantes.length})
+            </h1>
+          )}
+          <p className="text-sm text-ink-700">
+            {podeEditar
+              ? 'Cadastros chegam como “Pendente”. Combine o pagamento pelo WhatsApp e mude para “Ativo”.'
+              : 'Cadastros feitos no site. Para mudar o status de um assinante, fale com um admin.'}
           </p>
         </div>
 
@@ -242,9 +294,53 @@ export function AssinaturasManager({
           )}
         </div>
 
+        {/* Exportação para a planilha "Controle de Assinantes" */}
+        <div className="space-y-3 rounded-2xl border border-gold-500/40 bg-white p-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="text-sm text-ink-800">
+              <span className="mb-1 block font-medium">Cadastrados a partir de</span>
+              <input
+                type="date"
+                value={desde}
+                onChange={(e) => setDesde(e.target.value)}
+                className="rounded-lg border border-ink-700/20 bg-white px-3 py-2 text-sm text-ink-900 focus:border-gold-600 focus:outline-none focus:ring-1 focus:ring-gold-600"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleCopiar}
+              disabled={linhasExportacao.length === 0}
+              className="tap-target inline-flex items-center gap-2 rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-cream transition hover:bg-ink-800 disabled:opacity-50"
+            >
+              <ClipboardCopy className="h-4 w-4" aria-hidden />
+              Copiar para a planilha ({linhasExportacao.length})
+            </button>
+            <button
+              type="button"
+              onClick={handleBaixarCsv}
+              disabled={linhasExportacao.length === 0}
+              className="tap-target inline-flex items-center gap-2 rounded-xl border border-ink-700/25 px-4 py-2.5 text-sm font-semibold text-ink-900 transition hover:bg-ink-900/5 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" aria-hidden />
+              Baixar CSV
+            </button>
+          </div>
+          <p className="text-xs leading-relaxed text-ink-700">
+            Exporta os cadastros da lista abaixo (status e data escolhidos), do
+            mais antigo para o mais novo, já nas colunas da aba{' '}
+            <strong>Clientes</strong>: Cliente, WhatsApp, Plano, Período, Data do
+            pagamento, Status, Atendente e Observações. Na planilha, clique na{' '}
+            <strong>primeira célula vazia da coluna Cliente</strong> e cole
+            (Ctrl+V). Pelo CSV: Arquivo → Importar → Fazer upload →{' '}
+            <em>Substituir dados na célula selecionada</em>. Período e Data do
+            pagamento ficam em branco para a atendente completar; cadastros
+            pendentes vão sem status.
+          </p>
+        </div>
+
         {visiveis.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-ink-700/20 py-12 text-center text-sm text-ink-700/70">
-            Nenhum cadastro {filtro === 'todos' ? 'ainda' : 'com esse status'}.
+          <div className="rounded-2xl border border-dashed border-ink-700/20 py-12 text-center text-sm text-ink-700">
+            Nenhum cadastro {filtro === 'todos' && !desde ? 'ainda' : 'com esses filtros'}.
           </div>
         ) : (
           <ul className="space-y-3">
@@ -258,8 +354,9 @@ export function AssinaturasManager({
                     assinantes.map((a) => (a.id === atualizado.id ? atualizado : a))
                   )
                 }
-                onDelete={() => setAssinanteToDelete(assinante)}
+                onDelete={podeEditar ? () => setAssinanteToDelete(assinante) : undefined}
                 notify={notify}
+                podeEditar={podeEditar}
               />
             ))}
           </ul>
@@ -497,12 +594,14 @@ function AssinanteCard({
   onUpdated,
   onDelete,
   notify,
+  podeEditar,
 }: {
   assinante: Assinante;
   plano: PlanoAssinatura | undefined;
   onUpdated: (assinante: Assinante) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   notify: (message: string) => void;
+  podeEditar: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const [salvandoStatus, setSalvandoStatus] = useState(false);
@@ -569,6 +668,7 @@ function AssinanteCard({
           {STATUS_ASSINANTE.find((s) => s.value === assinante.status)?.label}
         </span>
 
+        {podeEditar && (
         <label className="flex items-center gap-2">
           <span className="sr-only">Status de {assinante.nome}</span>
           <select
@@ -584,6 +684,7 @@ function AssinanteCard({
             ))}
           </select>
         </label>
+        )}
 
         <a
           href={whatsappDoAssinante(assinante.whatsapp, mensagem)}
@@ -625,6 +726,7 @@ function AssinanteCard({
               <span className="whitespace-pre-line">{assinante.observacoes}</span>
             </Detalhe>
           )}
+          {onDelete && (
           <div className="sm:col-span-2">
             <button
               type="button"
@@ -635,6 +737,7 @@ function AssinanteCard({
               Excluir cadastro
             </button>
           </div>
+          )}
         </dl>
       )}
     </li>
@@ -656,4 +759,11 @@ function Detalhe({
       <dd className="mt-0.5 text-ink-900">{children}</dd>
     </div>
   );
+}
+
+/** "2026-11-21T02:07:07Z" -> "2026-11-20" no fuso do navegador (input date) */
+function dataLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

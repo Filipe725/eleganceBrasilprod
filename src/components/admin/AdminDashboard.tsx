@@ -265,9 +265,7 @@ export function AdminDashboard({
           <GalleryHorizontal className="h-4 w-4" aria-hidden />
           Hero &amp; Carrossel
         </button>
-        {isAdmin && (
-          <>
-            <button
+        <button
               type="button"
               onClick={() => setTab('assinaturas')}
               className={tabClass(tab === 'assinaturas')}
@@ -280,6 +278,7 @@ export function AdminDashboard({
                 </span>
               )}
             </button>
+        {isAdmin && (
             <button
               type="button"
               onClick={() => setTab('admins')}
@@ -288,7 +287,6 @@ export function AdminDashboard({
               <ShieldCheck className="h-4 w-4" aria-hidden />
               Equipe
             </button>
-          </>
         )}
       </div>
 
@@ -407,13 +405,14 @@ export function AdminDashboard({
         />
       )}
 
-      {isAdmin && tab === 'assinaturas' && (
+      {tab === 'assinaturas' && (
         <AssinaturasManager
           planos={planos}
           onPlanosChange={setPlanos}
           assinantes={assinantes}
           onAssinantesChange={setAssinantes}
           notify={notify}
+          podeEditar={isAdmin}
         />
       )}
 

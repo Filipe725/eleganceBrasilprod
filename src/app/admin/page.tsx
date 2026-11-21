@@ -56,11 +56,8 @@ export default async function AdminPage() {
     }
 
     if (user && isEquipe) {
-      // Assinaturas (dados pessoais) e planos só são buscados para admin;
-      // para vendedor a RLS já devolveria vazio, mas nem pedimos.
-      const somenteAdmin = <T,>(query: PromiseLike<T>) =>
-        isAdmin ? query : Promise.resolve(null);
-
+      // Assinantes e planos: a equipe toda LÊ (migration 012) para ver e
+      // exportar; só admin altera — a RLS garante isso no banco.
       const [
         perfumesRes,
         seccoesRes,
@@ -82,25 +79,21 @@ export default async function AdminPage() {
             .select('*')
             .order('ordem', { ascending: true }),
           supabase.from('hero_config').select('*').eq('id', 1).maybeSingle(),
-          somenteAdmin(
-            supabase
-              .from('planos_assinatura')
-              .select('*')
-              .order('ordem', { ascending: true })
-          ),
-          somenteAdmin(
-            supabase
-              .from('assinantes')
-              .select('*')
-              .order('created_at', { ascending: false })
-          ),
+          supabase
+            .from('planos_assinatura')
+            .select('*')
+            .order('ordem', { ascending: true }),
+          supabase
+            .from('assinantes')
+            .select('*')
+            .order('created_at', { ascending: false }),
         ]);
       perfumes = perfumesRes.data ?? [];
       seccoes = seccoesRes.data ?? [];
       heroSlides = heroSlidesRes.data ?? [];
       heroConfig = heroConfigRes.data ?? DEFAULT_HERO_CONFIG;
-      planos = planosRes?.data ?? [];
-      assinantes = assinantesRes?.data ?? [];
+      planos = planosRes.data ?? [];
+      assinantes = assinantesRes.data ?? [];
     }
   } catch {
     configError = true;
